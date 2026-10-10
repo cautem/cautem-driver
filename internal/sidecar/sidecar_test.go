@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-core/defaults"
+	"github.com/cautem/cautem-core/defaults"
 )
 
 func TestCABundleEnvIncludesGit(t *testing.T) {
@@ -39,8 +39,8 @@ func TestCABundleEnvIncludesGit(t *testing.T) {
 }
 
 func TestNeedsLinuxRebuildMissingSourceTree(t *testing.T) {
-	t.Setenv("CAUTEUM_REBUILD_CLI", "")
-	t.Setenv("CAUTEUM_REBUILD_INIT", "")
+	t.Setenv("CAUTEM_REBUILD_CLI", "")
+	t.Setenv("CAUTEM_REBUILD_INIT", "")
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "binary")
 	if err := os.WriteFile(binary, []byte("cached"), 0o755); err != nil {
@@ -52,8 +52,8 @@ func TestNeedsLinuxRebuildMissingSourceTree(t *testing.T) {
 }
 
 func TestNeedsLinuxRebuildChangedSource(t *testing.T) {
-	t.Setenv("CAUTEUM_REBUILD_CLI", "")
-	t.Setenv("CAUTEUM_REBUILD_INIT", "")
+	t.Setenv("CAUTEM_REBUILD_CLI", "")
+	t.Setenv("CAUTEM_REBUILD_INIT", "")
 	dir := t.TempDir()
 	binary := filepath.Join(dir, "binary")
 	if err := os.WriteFile(binary, []byte("cached"), 0o755); err != nil {

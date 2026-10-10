@@ -2,7 +2,7 @@ package docker
 
 import (
 	"fmt"
-	"github.com/cautem/cauteum-core/defaults"
+	"github.com/cautem/cautem-core/defaults"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,7 +13,7 @@ import (
 func providerWorkloadSocket(env []string) (string, error) {
 	for _, entry := range env {
 		key, value, ok := strings.Cut(entry, "=")
-		if !ok || key != "CAUTEUM_PROVIDER_SPIFFE_WORKLOAD_API_SOCKET" {
+		if !ok || key != "CAUTEM_PROVIDER_SPIFFE_WORKLOAD_API_SOCKET" {
 			continue
 		}
 		value = strings.TrimSpace(strings.TrimPrefix(value, "unix://"))
@@ -40,7 +40,7 @@ func (d *Driver) hostGatewayExtraHosts() []string {
 	if net.ParseIP(ip) == nil {
 		return HostGatewayExtraHosts()
 	}
-	return []string{"host.cauteum.internal:" + ip, "host.docker.internal:" + ip}
+	return []string{"host.cautem.internal:" + ip, "host.docker.internal:" + ip}
 }
 
 func (d *Driver) configuredPidsLimit(spec int64) int64 {
@@ -82,13 +82,13 @@ func (d *Driver) upstreamProxyEnv() []string {
 		"http_proxy=" + cfg.UpstreamProxyURL,
 		"NO_PROXY=" + cfg.UpstreamProxyNoProxy,
 		"no_proxy=" + cfg.UpstreamProxyNoProxy,
-		"CAUTEUM_PROXY_CONNECT_BY_HOSTNAME=" + strconv.FormatBool(cfg.UpstreamProxyConnectByHostname),
+		"CAUTEM_PROXY_CONNECT_BY_HOSTNAME=" + strconv.FormatBool(cfg.UpstreamProxyConnectByHostname),
 	}
 	if cfg.UpstreamProxyAuthFile != "" {
-		env = append(env, "CAUTEUM_PROXY_AUTH_FILE=/run/cauteum/upstream-proxy/auth")
+		env = append(env, "CAUTEM_PROXY_AUTH_FILE=/run/cautem/upstream-proxy/auth")
 	}
 	if cfg.UpstreamProxyCABundle != "" {
-		env = append(env, "CAUTEUM_PROXY_CA_BUNDLE=/run/cauteum/upstream-proxy/ca.pem")
+		env = append(env, "CAUTEM_PROXY_CA_BUNDLE=/run/cautem/upstream-proxy/ca.pem")
 	}
 	return env
 }
@@ -97,7 +97,7 @@ func (d *Driver) egressTrustEnv() []string {
 	if d == nil || strings.TrimSpace(d.runtimeConfig.EgressCABundle) == "" {
 		return nil
 	}
-	return []string{"CAUTEUM_EGRESS_CA_BUNDLE=/run/cauteum/egress-ca/ca.pem"}
+	return []string{"CAUTEM_EGRESS_CA_BUNDLE=/run/cautem/egress-ca/ca.pem"}
 }
 
 func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }

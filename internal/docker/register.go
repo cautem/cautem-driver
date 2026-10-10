@@ -3,7 +3,7 @@ package docker
 import (
 	"fmt"
 
-	"github.com/cautem/cauteum-driver/driver"
+	"github.com/cautem/cautem-driver/driver"
 	"github.com/moby/moby/client"
 )
 

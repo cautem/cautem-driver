@@ -14,36 +14,36 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-core"
-	"github.com/cautem/cauteum-driver/driver"
-	podman "github.com/cautem/cauteum-driver/internal/podman"
+	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-driver/driver"
+	podman "github.com/cautem/cautem-driver/internal/podman"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
 // TestPodmanEngineE2E exercises the same Engine API path used by the Docker
-// backend, against a real Podman service. Set CAUTEUM_PODMAN_E2E=1 and
+// backend, against a real Podman service. Set CAUTEM_PODMAN_E2E=1 and
 // DOCKER_HOST to an isolated Podman compatibility API endpoint to enable it.
 func TestPodmanEngineE2E(t *testing.T) {
-	if os.Getenv("CAUTEUM_PODMAN_E2E") != "1" {
-		t.Skip("set CAUTEUM_PODMAN_E2E=1 to run against a disposable Podman service")
+	if os.Getenv("CAUTEM_PODMAN_E2E") != "1" {
+		t.Skip("set CAUTEM_PODMAN_E2E=1 to run against a disposable Podman service")
 	}
-	workspace := strings.TrimSpace(os.Getenv("CAUTEUM_PODMAN_WORKSPACE"))
+	workspace := strings.TrimSpace(os.Getenv("CAUTEM_PODMAN_WORKSPACE"))
 	if workspace == "" {
-		t.Fatal("CAUTEUM_PODMAN_WORKSPACE must name a directory visible to both the test process and Podman service")
+		t.Fatal("CAUTEM_PODMAN_WORKSPACE must name a directory visible to both the test process and Podman service")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	image := strings.TrimSpace(os.Getenv("CAUTEUM_E2E_SANDBOX_IMAGE"))
+	image := strings.TrimSpace(os.Getenv("CAUTEM_E2E_SANDBOX_IMAGE"))
 	if image == "" {
 		image = "docker.io/library/alpine:3.22"
 	}
-	helperDir := strings.TrimSpace(os.Getenv("CAUTEUM_HELPERS_DIR"))
-	proxyBin := filepath.Join(helperDir, "cauteum")
-	proxyImage := strings.TrimSpace(os.Getenv("CAUTEUM_PROXY_IMAGE"))
+	helperDir := strings.TrimSpace(os.Getenv("CAUTEM_HELPERS_DIR"))
+	proxyBin := filepath.Join(helperDir, "cautem")
+	proxyImage := strings.TrimSpace(os.Getenv("CAUTEM_PROXY_IMAGE"))
 	policyPath := filepath.Join(workspace, "podman-driver-deny-policy.yaml")
 	if helperDir == "" || proxyImage == "" {
-		t.Fatal("CAUTEUM_HELPERS_DIR and CAUTEUM_PROXY_IMAGE are required for policy E2E")
+		t.Fatal("CAUTEM_HELPERS_DIR and CAUTEM_PROXY_IMAGE are required for policy E2E")
 	}
 	if err := os.WriteFile(policyPath, []byte("version: 1\nnetwork_policies: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -77,19 +77,19 @@ func TestPodmanEngineE2E(t *testing.T) {
 	}); err == nil {
 		t.Fatal("partial create with missing proxy binary unexpectedly succeeded")
 	}
-	if _, err := engineClient.NetworkInspect(ctx, "cauteum-net-"+partialName, client.NetworkInspectOptions{}); err == nil {
+	if _, err := engineClient.NetworkInspect(ctx, "cautem-net-"+partialName, client.NetworkInspectOptions{}); err == nil {
 		t.Fatal("partial Podman proxy create left its isolated network behind")
 	}
-	if _, err := engineClient.VolumeInspect(ctx, "cauteum-ca-"+partialName, client.VolumeInspectOptions{}); err == nil {
+	if _, err := engineClient.VolumeInspect(ctx, "cautem-ca-"+partialName, client.VolumeInspectOptions{}); err == nil {
 		t.Fatal("partial Podman proxy create left its CA volume behind")
 	}
 	runID := time.Now().UnixNano()
 	name := fmt.Sprintf("podman-e2e-%d", runID)
-	volumeName := fmt.Sprintf("cauteum-podman-e2e-cache-%d", runID)
+	volumeName := fmt.Sprintf("cautem-podman-e2e-cache-%d", runID)
 	driverConfig := fmt.Sprintf(`{"mounts":[{"type":"bind","source":%s,"target":"/openshell-bind","read_only":true,"selinux_label":"shared"},{"type":"volume","source":%s,"target":"/openshell-volume","read_only":false},{"type":"tmpfs","target":"/openshell-tmpfs","read_only":false,"size_bytes":4096,"mode":448}]}`, strconv.Quote(bindSource), strconv.Quote(volumeName))
 	h, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
-		Command:  []string{"/bin/sh", "-c", "echo cauteum-podman-e2e-ready; sleep 300"},
+		Command:  []string{"/bin/sh", "-c", "echo cautem-podman-e2e-ready; sleep 300"},
 		NoHarden: true, PersistVolume: true, CPU: 0.5, MemoryBytes: 256 << 20, PidsLimit: 128,
 		ProxyBin: proxyBin, ProxyImage: proxyImage, PolicyPath: policyPath,
 		DriverConfigJSON: driverConfig,
@@ -100,7 +100,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 		}
 		t.Fatalf("create sandbox through Podman Engine API: %v", err)
 	}
-	policyNetwork := fmt.Sprintf("cauteum-podman-policy-e2e-%d", time.Now().UnixNano())
+	policyNetwork := fmt.Sprintf("cautem-podman-policy-e2e-%d", time.Now().UnixNano())
 	if _, err := engineClient.NetworkCreate(ctx, policyNetwork, client.NetworkCreateOptions{Driver: "bridge", Internal: true}); err != nil {
 		t.Fatalf("create proxy-isolated Podman network: %v", err)
 	}
@@ -154,11 +154,11 @@ func TestPodmanEngineE2E(t *testing.T) {
 	}
 	probeTarget, closeProbeTarget := startPodmanPolicyProbeTarget(t, ctx, engineClient, image)
 	defer closeProbeTarget()
-	proxyNetwork, err := engineClient.NetworkInspect(ctx, "cauteum-net-"+name, client.NetworkInspectOptions{})
+	proxyNetwork, err := engineClient.NetworkInspect(ctx, "cautem-net-"+name, client.NetworkInspectOptions{})
 	if err != nil || !proxyNetwork.Network.Internal {
 		t.Fatalf("actual Podman sandbox network internal=%v err=%v; want Internal=true", proxyNetwork.Network.Internal, err)
 	}
-	proxyInfo, err := engineClient.ContainerInspect(ctx, "cauteum-proxy-"+name, client.ContainerInspectOptions{})
+	proxyInfo, err := engineClient.ContainerInspect(ctx, "cautem-proxy-"+name, client.ContainerInspectOptions{})
 	if err != nil {
 		t.Fatalf("inspect Podman policy proxy sidecar: %v", err)
 	}
@@ -167,12 +167,12 @@ func TestPodmanEngineE2E(t *testing.T) {
 		var closeHostTarget func()
 		hostTarget, closeHostTarget = startPodmanHostGatewayProbeTarget(t, ctx, engineClient, image, proxyNetwork.Network.IPAM.Config[0].Gateway.String())
 		defer closeHostTarget()
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cauteum-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
 			t.Fatalf("Podman sandbox reached host gateway directly at %s: result=%+v err=%v", hostTarget, result, err)
 		}
 	}
 	for _, probe := range [][]string{{"probe-tcp", probeTarget}, {"probe-udp", strings.TrimSuffix(probeTarget, ":17777") + ":17778"}} {
-		result, err := engine.Exec(ctx, core.ID(proxyInfo.Container.ID), driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cauteum-tcp-echo"}, probe...)})
+		result, err := engine.Exec(ctx, core.ID(proxyInfo.Container.ID), driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cautem-tcp-echo"}, probe...)})
 		if err != nil || result.ExitCode != 2 {
 			t.Fatalf("Podman policy sidecar could not reach control listener via bridge: probe=%v exit=%d err=%v", probe, result.ExitCode, err)
 		}
@@ -181,7 +181,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 		if _, err := engineClient.ContainerKill(ctx, proxyInfo.Container.ID, client.ContainerKillOptions{Signal: "KILL"}); err != nil {
 			t.Fatalf("stop proxy before host-gateway failure probe: %v", err)
 		}
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cauteum-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
 			t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
 		}
 	}
@@ -190,7 +190,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 		{"probe-tcp", probeTarget},
 		{"probe-udp", strings.TrimSuffix(probeTarget, ":17777") + ":17778"},
 	} {
-		result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cauteum-tcp-echo"}, probe...)})
+		result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cautem-tcp-echo"}, probe...)})
 		if err != nil || result.ExitCode != 0 {
 			t.Fatalf("network policy probe %v exit=%d err=%v; want denied", probe, result.ExitCode, err)
 		}
@@ -207,7 +207,7 @@ test "$(id -u)" = 1000
 grep -q '^NoNewPrivs:[[:space:]]*1$' /proc/self/status
 test "$(cat /openshell-bind/marker)" = bind-ok
 if touch /openshell-bind/write-denied 2>/dev/null; then exit 41; fi
-printf persisted > /cauteum/data/persisted
+printf persisted > /cautem/data/persisted
 printf volume > /openshell-volume/persisted
 test "$(stat -c %a /openshell-tmpfs)" = 700
 cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
@@ -225,12 +225,12 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	if err := engine.Start(ctx, h.ID); err != nil {
 		t.Fatalf("restart sandbox: %v", err)
 	}
-	result, err = engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/bin/sh", "-c", `set -eu; test "$(cat /cauteum/data/persisted)" = persisted; test "$(cat /openshell-volume/persisted)" = volume; test "$(stat -c %a /openshell-tmpfs)" = 700`}})
+	result, err = engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/bin/sh", "-c", `set -eu; test "$(cat /cautem/data/persisted)" = persisted; test "$(cat /openshell-volume/persisted)" = volume; test "$(stat -c %a /openshell-tmpfs)" = 700`}})
 	if err != nil || result.ExitCode != 0 {
 		t.Fatalf("stop/start persistence and tmpfs reset: result=%+v err=%v", result, err)
 	}
 	var logs bytes.Buffer
-	if err := engine.Logs(ctx, h.ID, false, &logs); err != nil || !strings.Contains(logs.String(), "cauteum-podman-e2e-ready") {
+	if err := engine.Logs(ctx, h.ID, false, &logs); err != nil || !strings.Contains(logs.String(), "cautem-podman-e2e-ready") {
 		t.Fatalf("sandbox logs=%q err=%v, expected readiness marker", logs.String(), err)
 	}
 	if err := engine.Stop(ctx, h.ID); err != nil {
@@ -249,7 +249,7 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 
 	// Explicit private ID maps use host IDs and are exercised in the rootful
 	// lane. The rootless lane uses Podman's allocated maps for auto/no-map.
-	if os.Getenv("CAUTEUM_PODMAN_ROOTLESS") != "1" {
+	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" {
 		mapped, err := podman.NewWithConfig(podman.Config{
 			ImagePullPolicy:         "missing",
 			UsernsMode:              "private",
@@ -369,8 +369,8 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 func startPodmanHostGatewayProbeTarget(t *testing.T, ctx context.Context, engine *client.Client, image, gateway string) (string, func()) {
 	t.Helper()
 	created, err := engine.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Name:       "cauteum-podman-host-gateway-probe-" + strconv.FormatInt(time.Now().UnixNano(), 10),
-		Config:     &container.Config{Image: image, User: "0", Entrypoint: []string{"/bin/sh"}, Cmd: []string{"-c", "/usr/local/bin/cauteum-tcp-echo serve-tcp 0.0.0.0:17779 & wait"}},
+		Name:       "cautem-podman-host-gateway-probe-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		Config:     &container.Config{Image: image, User: "0", Entrypoint: []string{"/bin/sh"}, Cmd: []string{"-c", "/usr/local/bin/cautem-tcp-echo serve-tcp 0.0.0.0:17779 & wait"}},
 		HostConfig: &container.HostConfig{NetworkMode: "host"},
 	})
 	if err != nil {
@@ -401,10 +401,10 @@ func startPodmanHostGatewayProbeTarget(t *testing.T, ctx context.Context, engine
 func startPodmanPolicyProbeTarget(t *testing.T, ctx context.Context, engine *client.Client, image string) (string, func()) {
 	t.Helper()
 	created, err := engine.ContainerCreate(ctx, client.ContainerCreateOptions{
-		Name: "cauteum-podman-policy-probe-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		Name: "cautem-podman-policy-probe-" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		Config: &container.Config{
 			Image: image, User: "0", Entrypoint: []string{"/bin/sh"},
-			Cmd: []string{"-c", "/usr/local/bin/cauteum-tcp-echo serve-tcp 0.0.0.0:17777 & /usr/local/bin/cauteum-tcp-echo serve-udp 0.0.0.0:17778 & wait"},
+			Cmd: []string{"-c", "/usr/local/bin/cautem-tcp-echo serve-tcp 0.0.0.0:17777 & /usr/local/bin/cautem-tcp-echo serve-udp 0.0.0.0:17778 & wait"},
 		},
 		HostConfig: &container.HostConfig{NetworkMode: "bridge"},
 	})
@@ -451,7 +451,7 @@ func podmanPolicyProbeContainerExit(ctx context.Context, engine *client.Client, 
 	defer cancel()
 	created, err := engine.ExecCreate(checkCtx, containerID, client.ExecCreateOptions{
 		TTY: true, AttachStdout: true, AttachStderr: true,
-		Cmd: []string{"/usr/local/bin/cauteum-tcp-echo", mode, target},
+		Cmd: []string{"/usr/local/bin/cautem-tcp-echo", mode, target},
 	})
 	if err != nil {
 		return -1

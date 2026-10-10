@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-driver/driver"
-	docker "github.com/cautem/cauteum-driver/internal/docker"
-	"github.com/cautem/cauteum-driver/tests/internal/testenv"
+	"github.com/cautem/cautem-driver/driver"
+	docker "github.com/cautem/cautem-driver/internal/docker"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/client"
 )
 
@@ -24,7 +24,7 @@ func TestDockerDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 
 	engine := docker.NewFromClientWithRuntimeConfig(engineClient, docker.RuntimeConfig{
 		ImagePullPolicy: "missing",
-		NetworkName:     "cauteum-testcontainers",
+		NetworkName:     "cautem-testcontainers",
 	})
 	defer engine.Close()
 
@@ -38,7 +38,7 @@ func TestDockerDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 		CPU:              0.25,
 		MemoryBytes:      128 * 1024 * 1024,
 		PidsLimit:        64,
-		DriverConfigJSON: `{"mounts":[{"type":"volume","source":"cauteum-testcontainers-docker-data","target":"/persist","read_only":false},{"type":"volume","source":"cauteum-testcontainers-docker-readonly","target":"/readonly","read_only":true},{"type":"tmpfs","target":"/scratch","size_bytes":4096,"read_only":false}]}`,
+		DriverConfigJSON: `{"mounts":[{"type":"volume","source":"cautem-testcontainers-docker-data","target":"/persist","read_only":false},{"type":"volume","source":"cautem-testcontainers-docker-readonly","target":"/readonly","read_only":true},{"type":"tmpfs","target":"/scratch","size_bytes":4096,"read_only":false}]}`,
 	})
 	if err != nil {
 		t.Fatalf("create sandbox through Docker driver: %v", err)
@@ -100,7 +100,7 @@ func TestDockerDriverRecoversAfterDaemonRestart(t *testing.T) {
 
 	engine := docker.NewFromClientWithRuntimeConfig(engineClient, docker.RuntimeConfig{
 		ImagePullPolicy: "missing",
-		NetworkName:     "cauteum-testcontainers-recovery",
+		NetworkName:     "cautem-testcontainers-recovery",
 	})
 	defer engine.Close()
 

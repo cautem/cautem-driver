@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cautem/cauteum-driver/driver"
+	"github.com/cautem/cautem-driver/driver"
 )
 
 func TestDeviceRequestsForGPU(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDeviceRequestsForGPU(t *testing.T) {
 	if len(reqs) != 1 || len(reqs[0].DeviceIDs) != 1 || reqs[0].DeviceIDs[0] != "nvidia.com/gpu=0" {
 		t.Fatalf("reqs=%+v", reqs)
 	}
-	t.Setenv("CAUTEUM_GPU_CDI", "nvidia.com/gpu=1,nvidia.com/gpu=2")
+	t.Setenv("CAUTEM_GPU_CDI", "nvidia.com/gpu=1,nvidia.com/gpu=2")
 	reqs = DeviceRequestsForGPU(driver.Spec{GPU: true})
 	if len(reqs[0].DeviceIDs) != 2 {
 		t.Fatalf("env ids=%v", reqs[0].DeviceIDs)

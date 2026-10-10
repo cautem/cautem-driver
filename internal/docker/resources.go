@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2026 cauteum
+// SPDX-FileCopyrightText: Copyright (c) 2026 cautem
 // SPDX-License-Identifier: Apache-2.0
 
 package docker
@@ -8,16 +8,16 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cautem/cauteum-core/defaults"
+	"github.com/cautem/cautem-core/defaults"
 )
 
 const (
-	envProxyImage       = "CAUTEUM_PROXY_IMAGE"
-	envSandboxPidsLimit = "CAUTEUM_SANDBOX_PIDS_LIMIT"
+	envProxyImage       = "CAUTEM_PROXY_IMAGE"
+	envSandboxPidsLimit = "CAUTEM_SANDBOX_PIDS_LIMIT"
 )
 
 // resolveProxyImage returns the OCI image for the egress sidecar.
-// Prefer Spec.ProxyImage, then CAUTEUM_PROXY_IMAGE, then defaults.ImageProxy.
+// Prefer Spec.ProxyImage, then CAUTEM_PROXY_IMAGE, then defaults.ImageProxy.
 // Never reuse the fat agent/sandbox image unless the operator points ProxyImage at it.
 func resolveProxyImage(explicit string) string {
 	if s := strings.TrimSpace(explicit); s != "" {
@@ -30,7 +30,7 @@ func resolveProxyImage(explicit string) string {
 }
 
 // resolvePidsLimit returns the Docker PidsLimit pointer.
-// Spec 0 → env CAUTEUM_SANDBOX_PIDS_LIMIT or OpenShell-aligned 2048.
+// Spec 0 → env CAUTEM_SANDBOX_PIDS_LIMIT or OpenShell-aligned 2048.
 // Spec -1 or env 0 → unlimited (nil).
 // Spec > 0 → that value.
 func resolvePidsLimit(specLimit int64) *int64 {

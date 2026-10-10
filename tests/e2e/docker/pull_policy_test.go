@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-driver/driver"
-	docker "github.com/cautem/cauteum-driver/internal/docker"
-	"github.com/cautem/cauteum-driver/tests/internal/testenv"
+	"github.com/cautem/cautem-driver/driver"
+	docker "github.com/cautem/cautem-driver/internal/docker"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/client"
 )
 
@@ -21,13 +21,13 @@ func TestDockerPullPolicyNeverFailsClosedBeforeNetworkCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cli.Close()
-	engine := docker.NewFromClientWithRuntimeConfig(cli, docker.RuntimeConfig{ImagePullPolicy: "never", NetworkName: "cauteum-pull-policy"})
+	engine := docker.NewFromClientWithRuntimeConfig(cli, docker.RuntimeConfig{ImagePullPolicy: "never", NetworkName: "cautem-pull-policy"})
 	defer engine.Close()
-	_, err = engine.Create(ctx, driver.Spec{Name: "never-missing", Image: "example.invalid/cauteum/missing:never", Workspace: "/tmp", NoHarden: true})
+	_, err = engine.Create(ctx, driver.Spec{Name: "never-missing", Image: "example.invalid/cautem/missing:never", Workspace: "/tmp", NoHarden: true})
 	if err == nil || !strings.Contains(err.Error(), "image_pull_policy is never") {
 		t.Fatalf("never policy error=%v", err)
 	}
-	if _, err := cli.NetworkInspect(ctx, "cauteum-pull-policy-never-missing", client.NetworkInspectOptions{}); err == nil {
+	if _, err := cli.NetworkInspect(ctx, "cautem-pull-policy-never-missing", client.NetworkInspectOptions{}); err == nil {
 		t.Fatal("never policy created a network before rejecting missing image")
 	}
 }
@@ -50,7 +50,7 @@ func TestDockerPullPolicySupportsDigestPinnedImage(t *testing.T) {
 	if err != nil || len(image.RepoDigests) == 0 {
 		t.Fatalf("inspect pulled image digests=%v err=%v", image.RepoDigests, err)
 	}
-	engine := docker.NewFromClientWithRuntimeConfig(cli, docker.RuntimeConfig{ImagePullPolicy: "missing", NetworkName: "cauteum-digest"})
+	engine := docker.NewFromClientWithRuntimeConfig(cli, docker.RuntimeConfig{ImagePullPolicy: "missing", NetworkName: "cautem-digest"})
 	defer engine.Close()
 	handle, err := engine.Create(ctx, driver.Spec{Name: "digest-pinned", Image: image.RepoDigests[0], Workspace: "/tmp", Command: []string{"sleep", "30"}, NoHarden: true})
 	if err != nil {

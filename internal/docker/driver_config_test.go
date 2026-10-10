@@ -67,7 +67,7 @@ func TestDockerMountValidationSecurityCorpus(t *testing.T) {
 		{name: "bind private relabel", mount: `{"type":"bind","source":` + strconv.Quote(validBind) + `,"target":"/data","selinux_label":"private"}`, binds: true, wantSuffix: ":/data:ro,Z"},
 		{name: "bind disabled", mount: `{"type":"bind","source":` + strconv.Quote(validBind) + `,"target":"/data"}`, wantErr: true},
 		{name: "relative bind source", mount: `{"type":"bind","source":"relative","target":"/data"}`, binds: true, wantErr: true},
-		{name: "missing bind source", mount: `{"type":"bind","source":"/missing/cauteum-source","target":"/data"}`, binds: true, wantErr: true},
+		{name: "missing bind source", mount: `{"type":"bind","source":"/missing/cautem-source","target":"/data"}`, binds: true, wantErr: true},
 		{name: "invalid SELinux label", mount: `{"type":"bind","source":` + strconv.Quote(validBind) + `,"target":"/data","selinux_label":"relabel-all"}`, binds: true, wantErr: true},
 		{name: "root target", mount: `{"type":"volume","source":"cache","target":"/"}`, wantErr: true},
 		{name: "relative target", mount: `{"type":"volume","source":"cache","target":"data"}`, wantErr: true},

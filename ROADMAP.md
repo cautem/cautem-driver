@@ -1,6 +1,6 @@
-# Roadmap — cauteum-driver
+# Roadmap — cautem-driver
 
-Status: **v0.1.4** (stable numbered release) · Depends on [cauteum-core](https://github.com/cauteum-haven/cauteum-core) `v0.1.4`
+Status: **v0.1.6** (stable numbered release) · Depends on [cautem-core](https://github.com/cautem/cautem-core) `v0.1.6`
 
 ## This module
 
@@ -13,4 +13,4 @@ Status: **v0.1.4** (stable numbered release) · Depends on [cauteum-core](https:
 
 ## Release
 
-Requires cauteum-core `v0.1.0-alpha.1` · tagged after core in the cascade.
+Requires cautem-core `v0.1.0-alpha.1` · tagged after core in the cascade.

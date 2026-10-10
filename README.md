@@ -1,26 +1,26 @@
-<h1 align="center">cauteum-driver</h1>
+<h1 align="center">cautem-driver</h1>
 
 <p align="center">
   <strong>Compute drivers</strong><br>
   Docker-first sandbox runtime — mounts, ExtraHosts, egress sidecar wiring.
 </p>
 <p align="center">
-  <a href="https://github.com/cautem/cauteum-driver/actions/workflows/ci.yml"><img src="https://github.com/cautem/cauteum-driver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/cautem/cauteum-driver"><img src="https://pkg.go.dev/badge/github.com/cautem/cauteum-driver.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cautem/cautem-driver/actions/workflows/ci.yml"><img src="https://github.com/cautem/cautem-driver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cautem/cautem-driver"><img src="https://pkg.go.dev/badge/github.com/cautem/cautem-driver.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cautem/cauteum-driver"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cautem/cautem-driver"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
-  <sub>Part of the <a href="https://github.com/cautem">cauteum / cauteum</a> ecosystem</sub>
+  <sub>Part of the <a href="https://github.com/cautem">cautem / cautem</a> ecosystem</sub>
 </p>
 
 ---
 
 ## Overview
 
-Backend setup and runtime limits are maintained in the [Docker](https://cautem.github.io/cauteum-haven.github.io/providers/docker/) and [Podman](https://cautem.github.io/cauteum-haven.github.io/providers/podman/) guides. The [OpenShell compatibility page](https://cautem.github.io/cauteum-haven.github.io/reference/openshell-compatibility/) records the current comparison scope.
+Backend setup and runtime limits are maintained in the [Docker](https://cautem.github.io/sandbox.dev/providers/docker/) and [Podman](https://cautem.github.io/sandbox.dev/providers/podman/) guides. The [OpenShell compatibility page](https://cautem.github.io/sandbox.dev/reference/openshell-compatibility/) records the current comparison scope.
 
-**cauteum-driver** implements `ComputeDriver` for cauteum: create/start/exec/delete containers, attach the egress sidecar, validate bind mounts, and inject OpenShell-style host-gateway aliases (`host.cauteum.internal`).
+**cautem-driver** implements `ComputeDriver` for cautem: create/start/exec/delete containers, attach the egress sidecar, validate bind mounts, and inject OpenShell-style host-gateway aliases (`host.cautem.internal`).
 
 ### Key Features
 
@@ -28,7 +28,7 @@ Backend setup and runtime limits are maintained in the [Docker](https://cautem.g
 |----------|--------------|
 | **Docker** | Engine API create/exec/logs (Podman-compatible socket) |
 | **Sidecar** | Proxy container on dual-home network + CA bundle env |
-| **Hosts** | `HostGatewayExtraHosts()` → `host.cauteum.internal` / `host.docker.internal` |
+| **Hosts** | `HostGatewayExtraHosts()` → `host.cautem.internal` / `host.docker.internal` |
 | **Mounts** | Workdir + reserved system paths validation |
 | **Stubs** | VM / K8s placeholders for future drivers |
 
@@ -51,15 +51,15 @@ cover the client code; keep the Engine daemon updated independently.
 
 ```go
 import (
-    "github.com/cautem/cauteum-driver/driver"
-    _ "github.com/cautem/cauteum-driver/driver/all" // register backends
+    "github.com/cautem/cautem-driver/driver"
+    _ "github.com/cautem/cautem-driver/driver/all" // register backends
 )
 
 d, err := driver.OpenEngine("docker")
 _ = d
 _ = err
 hosts := driver.HostGatewayExtraHosts()
-// []string{"host.cauteum.internal:host-gateway", "host.docker.internal:host-gateway"}
+// []string{"host.cautem.internal:host-gateway", "host.docker.internal:host-gateway"}
 _ = hosts
 ```
 
@@ -87,8 +87,8 @@ _ = hosts
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
 | Organization | [https://github.com/cautem](https://github.com/cautem) |
 | Organization overview | [github.com/cautem](https://github.com/cautem) |
-| pkg.go.dev | [`github.com/cautem/cauteum-driver`](https://pkg.go.dev/github.com/cautem/cauteum-driver) |
+| pkg.go.dev | [`github.com/cautem/cautem-driver`](https://pkg.go.dev/github.com/cautem/cautem-driver) |
 
 ## License
 
-[Apache-2.0](./LICENSE) © cauteum
+[Apache-2.0](./LICENSE) © cautem

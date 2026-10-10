@@ -2,7 +2,7 @@ package driver
 
 import "context"
 
-// Probe is a host-side Docker/Podman readiness report for `cauteum health`.
+// Probe is a host-side Docker/Podman readiness report for `cautem health`.
 type Probe struct {
 	OK              bool
 	ServerVersion   string

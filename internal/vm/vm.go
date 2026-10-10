@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cautem/cauteum-core"
-	"github.com/cautem/cauteum-driver/driver"
+	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-driver/driver"
 )
 
 // Driver is a placeholder for libkrun/QEMU backends.
