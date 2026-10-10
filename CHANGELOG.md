@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.1.7] - 2026-10-11
+
+### Fixed
+
+- Use the published cautem sandbox base when no local sandbox image is available, so the default hardened sandbox has the required `sandbox` user and `cautem-init` entrypoint.
+
 ## [v0.1.6] - 2026-10-11
 
 ### Changed

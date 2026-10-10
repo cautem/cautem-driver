@@ -16,7 +16,7 @@ const SupervisorControlSocketName = "supervisor-control.sock"
 // Spec describes a sandbox to create.
 type Spec struct {
 	Name      string   // human name → container cautem-<name>
-	Image     string   // default debian:bookworm
+	Image     string   // default cautem-sandbox:local (published cautem base)
 	Workspace string   // absolute host path → /workspace
 	Command   []string // default: sleep infinity
 	Env       []string // KEY=VAL (already allowlisted by caller)
