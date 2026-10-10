@@ -8,8 +8,8 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 
-	"github.com/cautem/cauteum-core/defaults"
-	"github.com/cautem/cauteum-driver/driver"
+	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/cautem-driver/driver"
 )
 
 // ValidateGPURequest enforces the pinned OpenShell relationship between a
@@ -47,7 +47,7 @@ func ValidateGPURequest(spec driver.Spec) error {
 
 const (
 	defaultCDIDevice = "nvidia.com/gpu=all"
-	labelGPU         = "cauteum.gpu"
+	labelGPU         = "cautem.gpu"
 	gpuSandboxImage  = defaults.ImageGPU
 )
 
@@ -86,7 +86,7 @@ func normalizedCDIDevices(values []string) []string {
 }
 
 func envCDIDevices() []string {
-	return normalizedCDIDevices(strings.Split(strings.TrimSpace(os.Getenv("CAUTEUM_GPU_CDI")), ","))
+	return normalizedCDIDevices(strings.Split(strings.TrimSpace(os.Getenv("CAUTEM_GPU_CDI")), ","))
 }
 
 // localCDIDevices mirrors the pinned Podman inventory rule: only numbered

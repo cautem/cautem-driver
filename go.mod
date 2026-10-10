@@ -1,11 +1,11 @@
-module github.com/cautem/cauteum-driver
+module github.com/cautem/cautem-driver
 
 go 1.27.0
 
 toolchain go1.27.2
 
 require (
-	github.com/cautem/cauteum-core v0.1.5
+	github.com/cautem/cautem-core v0.1.6
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.2.0+incompatible
 	github.com/docker/go-units v0.5.0

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 the cauteum authors
+# SPDX-FileCopyrightText: Copyright (c) 2026 the cautem authors
 # SPDX-License-Identifier: Apache-2.0
 name: Podman E2E
 
@@ -18,20 +18,20 @@ jobs:
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: cauteum-driver
+        working-directory: cautem-driver
     env:
-      CAUTEUM_TESTCONTAINERS: "1"
-      CAUTEUM_TEST_PODMAN_IMAGE: cauteum-podman6-e2e:local
+      CAUTEM_TESTCONTAINERS: "1"
+      CAUTEM_TEST_PODMAN_IMAGE: cautem-podman6-e2e:local
     steps:
       - name: Checkout driver
         uses: actions/checkout@v4
         with:
-          path: cauteum-driver
+          path: cautem-driver
       - name: Checkout core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cauteum-core
-          path: cauteum-core
+          repository: cautem/cautem-core
+          path: cautem-core
           ref: 683b09a16a93e93ca860ea0c723baa369a3b5c75
       - name: Configure Go workspace
         working-directory: ${{ github.workspace }}
@@ -41,8 +41,8 @@ jobs:
           go 1.27.0
 
           use (
-            ./cauteum-core
-            ./cauteum-driver
+            ./cautem-core
+            ./cautem-driver
           )
           EOF
       - uses: actions/setup-go@v5
@@ -50,10 +50,10 @@ jobs:
           go-version: "1.27.2"
           cache: true
           cache-dependency-path: |
-            cauteum-driver/go.sum
-            cauteum-core/go.sum
+            cautem-driver/go.sum
+            cautem-core/go.sum
       - name: Build official Podman 6 E2E image
-        run: docker build -f tests/e2e/podman/Containerfile.podman6 -t "$CAUTEUM_TEST_PODMAN_IMAGE" .
+        run: docker build -f tests/e2e/podman/Containerfile.podman6 -t "$CAUTEM_TEST_PODMAN_IMAGE" .
       - name: Run Podman behavioral E2E suite
         shell: bash
         run: |
@@ -72,7 +72,7 @@ jobs:
           done
           {
             echo "### Podman behavioral E2E"
-            echo "- Engine: rootful $(docker run --rm "$CAUTEUM_TEST_PODMAN_IMAGE" podman --version) from Fedora 45 in a disposable privileged container"
+            echo "- Engine: rootful $(docker run --rm "$CAUTEM_TEST_PODMAN_IMAGE" podman --version) from Fedora 45 in a disposable privileged container"
             echo "- Required tests passed: 4 (lifecycle, service recovery, pull policy, digest pinning)"
             echo "- Rootless coverage: not included in this job"
           } >> "$GITHUB_STEP_SUMMARY"

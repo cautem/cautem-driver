@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-driver/driver"
-	podman "github.com/cautem/cauteum-driver/internal/podman"
-	"github.com/cautem/cauteum-driver/tests/internal/testenv"
+	"github.com/cautem/cautem-driver/driver"
+	podman "github.com/cautem/cautem-driver/internal/podman"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/client"
 )
 
@@ -22,16 +22,16 @@ func TestPodmanPullPolicyNeverFailsClosedBeforeNetworkCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cli.Close()
-	engine, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "never", UsernsMode: "host", NetworkName: "cauteum-pull-policy"})
+	engine, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "never", UsernsMode: "host", NetworkName: "cautem-pull-policy"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer engine.Close()
-	_, err = engine.Create(ctx, driver.Spec{Name: "never-missing", Image: "example.invalid/cauteum/missing:never", Workspace: workspace, NoHarden: true})
+	_, err = engine.Create(ctx, driver.Spec{Name: "never-missing", Image: "example.invalid/cautem/missing:never", Workspace: workspace, NoHarden: true})
 	if err == nil || !strings.Contains(err.Error(), "image_pull_policy is never") {
 		t.Fatalf("never policy error=%v", err)
 	}
-	if _, err := cli.NetworkInspect(ctx, "cauteum-pull-policy-never-missing", client.NetworkInspectOptions{}); err == nil {
+	if _, err := cli.NetworkInspect(ctx, "cautem-pull-policy-never-missing", client.NetworkInspectOptions{}); err == nil {
 		t.Fatal("never policy created a network before rejecting missing image")
 	}
 }
@@ -55,7 +55,7 @@ func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
 	if err != nil || len(image.RepoDigests) == 0 {
 		t.Fatalf("inspect pulled image digests=%v err=%v", image.RepoDigests, err)
 	}
-	engine, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "missing", UsernsMode: "host", NetworkName: "cauteum-digest"})
+	engine, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "missing", UsernsMode: "host", NetworkName: "cautem-digest"})
 	if err != nil {
 		t.Fatal(err)
 	}

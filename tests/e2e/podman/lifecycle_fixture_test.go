@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-driver/driver"
-	podman "github.com/cautem/cauteum-driver/internal/podman"
-	"github.com/cautem/cauteum-driver/tests/internal/testenv"
+	"github.com/cautem/cautem-driver/driver"
+	podman "github.com/cautem/cautem-driver/internal/podman"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/client"
 )
 
@@ -21,7 +21,7 @@ func TestPodmanDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 
 	engine, err := podman.NewWithConfig(podman.Config{
 		ImagePullPolicy:         "missing",
-		NetworkName:             "cauteum-testcontainers",
+		NetworkName:             "cautem-testcontainers",
 		HealthCheckIntervalSecs: 0,
 		UsernsMode:              "host",
 	})
@@ -39,7 +39,7 @@ func TestPodmanDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 		CPU:              0.25,
 		MemoryBytes:      128 * 1024 * 1024,
 		PidsLimit:        64,
-		DriverConfigJSON: `{"mounts":[{"type":"volume","source":"cauteum-testcontainers-podman-data","target":"/persist","read_only":false},{"type":"volume","source":"cauteum-testcontainers-podman-readonly","target":"/readonly","read_only":true},{"type":"tmpfs","target":"/scratch","size_bytes":4096,"read_only":false}]}`,
+		DriverConfigJSON: `{"mounts":[{"type":"volume","source":"cautem-testcontainers-podman-data","target":"/persist","read_only":false},{"type":"volume","source":"cautem-testcontainers-podman-readonly","target":"/readonly","read_only":true},{"type":"tmpfs","target":"/scratch","size_bytes":4096,"read_only":false}]}`,
 	})
 	if err != nil {
 		t.Fatalf("create sandbox through Podman driver: %v", err)
@@ -86,7 +86,7 @@ func TestPodmanDriverRecoversAfterServiceRestart(t *testing.T) {
 	defer api.Close()
 	engine, err := podman.NewWithConfig(podman.Config{
 		ImagePullPolicy:         "missing",
-		NetworkName:             "cauteum-testcontainers-recovery",
+		NetworkName:             "cautem-testcontainers-recovery",
 		HealthCheckIntervalSecs: 0,
 		UsernsMode:              "host",
 	})
@@ -151,15 +151,15 @@ func TestPodmanDriverRecoversAfterServiceRestart(t *testing.T) {
 }
 
 func TestPodmanRootlessServiceRecovery(t *testing.T) {
-	if os.Getenv("CAUTEUM_PODMAN_ROOTLESS") != "1" {
+	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" {
 		t.Skip("rootless Podman service lane is not enabled")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	workspace := strings.TrimSpace(os.Getenv("CAUTEUM_PODMAN_WORKSPACE"))
-	image := strings.TrimSpace(os.Getenv("CAUTEUM_E2E_SANDBOX_IMAGE"))
+	workspace := strings.TrimSpace(os.Getenv("CAUTEM_PODMAN_WORKSPACE"))
+	image := strings.TrimSpace(os.Getenv("CAUTEM_E2E_SANDBOX_IMAGE"))
 	if workspace == "" || image == "" {
-		t.Fatal("CAUTEUM_PODMAN_WORKSPACE and CAUTEUM_E2E_SANDBOX_IMAGE are required")
+		t.Fatal("CAUTEM_PODMAN_WORKSPACE and CAUTEM_E2E_SANDBOX_IMAGE are required")
 	}
 
 	api, err := client.New(client.FromEnv)
@@ -169,7 +169,7 @@ func TestPodmanRootlessServiceRecovery(t *testing.T) {
 	defer api.Close()
 	engine, err := podman.NewWithConfig(podman.Config{
 		ImagePullPolicy:         "missing",
-		NetworkName:             "cauteum-rootless-recovery",
+		NetworkName:             "cautem-rootless-recovery",
 		HealthCheckIntervalSecs: 0,
 		UsernsMode:              "host",
 	})
@@ -237,17 +237,17 @@ func TestPodmanRootlessServiceRecovery(t *testing.T) {
 // route required by proxy-backed sandboxes, but that limitation must not hide
 // the identity contract we can verify on the same daemon.
 func TestPodmanUsernsMatrixE2E(t *testing.T) {
-	if os.Getenv("CAUTEUM_PODMAN_USERNS_E2E") != "1" {
-		t.Skip("set CAUTEUM_PODMAN_USERNS_E2E=1 to run the Podman userns matrix")
+	if os.Getenv("CAUTEM_PODMAN_USERNS_E2E") != "1" {
+		t.Skip("set CAUTEM_PODMAN_USERNS_E2E=1 to run the Podman userns matrix")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	workspace := strings.TrimSpace(os.Getenv("CAUTEUM_PODMAN_WORKSPACE"))
-	image := strings.TrimSpace(os.Getenv("CAUTEUM_E2E_SANDBOX_IMAGE"))
+	workspace := strings.TrimSpace(os.Getenv("CAUTEM_PODMAN_WORKSPACE"))
+	image := strings.TrimSpace(os.Getenv("CAUTEM_E2E_SANDBOX_IMAGE"))
 	if workspace == "" || image == "" {
-		t.Fatal("CAUTEUM_PODMAN_WORKSPACE and CAUTEUM_E2E_SANDBOX_IMAGE are required")
+		t.Fatal("CAUTEM_PODMAN_WORKSPACE and CAUTEM_E2E_SANDBOX_IMAGE are required")
 	}
-	rootless := os.Getenv("CAUTEUM_PODMAN_ROOTLESS") == "1"
+	rootless := os.Getenv("CAUTEM_PODMAN_ROOTLESS") == "1"
 	for _, mode := range []string{"private", "auto", "host", "keep-id", "no-map"} {
 		t.Run(mode, func(t *testing.T) {
 			if rootless && mode == "private" {

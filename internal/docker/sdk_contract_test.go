@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cauteum-core"
-	"github.com/cautem/cauteum-driver/driver"
+	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-driver/driver"
 	"github.com/moby/moby/client"
 )
 
@@ -161,7 +161,7 @@ func TestEnsureNetworkReusesInternalProxyNetwork(t *testing.T) {
 func TestCreateProxySidecarMountsUpstreamCredentialsOutsideSandbox(t *testing.T) {
 	authPath := filepath.Join(t.TempDir(), "auth")
 	caPath := filepath.Join(t.TempDir(), "ca.pem")
-	binPath := filepath.Join(t.TempDir(), "cauteum")
+	binPath := filepath.Join(t.TempDir(), "cautem")
 	policyPath := filepath.Join(t.TempDir(), "policy.yaml")
 	for path, data := range map[string]string{
 		authPath:   "robot:s3cret",
@@ -189,7 +189,7 @@ func TestCreateProxySidecarMountsUpstreamCredentialsOutsideSandbox(t *testing.T)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/cauteum-proxy-fixture"):
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/containers/cautem-proxy-fixture"):
 			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1.41/containers/create":
 			if err := json.NewDecoder(r.Body).Decode(&created); err != nil {
@@ -215,7 +215,7 @@ func TestCreateProxySidecarMountsUpstreamCredentialsOutsideSandbox(t *testing.T)
 		UpstreamProxyCABundle:          caPath,
 		UpstreamProxyConnectByHostname: true,
 	})
-	err = d.createProxySidecar(ctx, "fixture", "cauteum-net-fixture", "proxy:latest", binPath, policyPath, 3128, "", "", "", nil, 0)
+	err = d.createProxySidecar(ctx, "fixture", "cautem-net-fixture", "proxy:latest", binPath, policyPath, 3128, "", "", "", nil, 0)
 	if err == nil {
 		t.Fatal("proxy create unexpectedly reached readiness with canceled context")
 	}
@@ -224,9 +224,9 @@ func TestCreateProxySidecarMountsUpstreamCredentialsOutsideSandbox(t *testing.T)
 		t.Fatalf("proxy image=%q", created.Image)
 	}
 	for _, want := range []string{
-		"CAUTEUM_PROXY_AUTH_FILE=/run/cauteum/upstream-proxy/auth",
-		"CAUTEUM_PROXY_CA_BUNDLE=/run/cauteum/upstream-proxy/ca.pem",
-		"CAUTEUM_PROXY_CONNECT_BY_HOSTNAME=true",
+		"CAUTEM_PROXY_AUTH_FILE=/run/cautem/upstream-proxy/auth",
+		"CAUTEM_PROXY_CA_BUNDLE=/run/cautem/upstream-proxy/ca.pem",
+		"CAUTEM_PROXY_CONNECT_BY_HOSTNAME=true",
 		"NO_PROXY=localhost,.svc.cluster.local",
 	} {
 		if !containsEnvValue(created.Env, strings.SplitN(want, "=", 2)[0], strings.SplitN(want, "=", 2)[1]) {
@@ -239,7 +239,7 @@ func TestCreateProxySidecarMountsUpstreamCredentialsOutsideSandbox(t *testing.T)
 		}
 	}
 	joinedBinds := strings.Join(created.HostConfig.Binds, "\n")
-	for _, want := range []string{authPath + ":/run/cauteum/upstream-proxy/auth:ro", caPath + ":/run/cauteum/upstream-proxy/ca.pem:ro"} {
+	for _, want := range []string{authPath + ":/run/cautem/upstream-proxy/auth:ro", caPath + ":/run/cautem/upstream-proxy/ca.pem:ro"} {
 		if !strings.Contains(joinedBinds, want) {
 			t.Errorf("proxy bind missing %q: %v", want, created.HostConfig.Binds)
 		}
@@ -285,13 +285,13 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&created); err != nil {
 				t.Error(err)
 			}
-			if r.URL.Query().Get("name") != "cauteum-sdk-fixture" {
+			if r.URL.Query().Get("name") != "cautem-sdk-fixture" {
 				t.Errorf("container name=%q", r.URL.Query().Get("name"))
 			}
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `{"Id":"container-id"}`)
 		case r.URL.Path == "/v1.41/containers/container-id/json":
-			_, _ = io.WriteString(w, `{"Id":"container-id","Name":"/cauteum-sdk-fixture","Config":{"Image":"busybox:latest","Labels":{"cauteum.sandbox":"1","cauteum.name":"sdk-fixture","cauteum.network":"cauteum-net-sdk-fixture"}},"State":{"Status":"running"},"NetworkSettings":{"Networks":{"cauteum-net-sdk-fixture":{"IPAddress":"172.18.0.2"}}}}`)
+			_, _ = io.WriteString(w, `{"Id":"container-id","Name":"/cautem-sdk-fixture","Config":{"Image":"busybox:latest","Labels":{"cautem.sandbox":"1","cautem.name":"sdk-fixture","cautem.network":"cautem-net-sdk-fixture"}},"State":{"Status":"running"},"NetworkSettings":{"Networks":{"cautem-net-sdk-fixture":{"IPAddress":"172.18.0.2"}}}}`)
 		default:
 			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
 			w.WriteHeader(http.StatusNotFound)
@@ -306,7 +306,7 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 	bindSource := t.TempDir()
 	ctx := context.Background()
 	driverConfigJSON := fmt.Sprintf(`{"cdi_devices":["nvidia.com/gpu=7"],"mounts":[{"type":"volume","source":"cache","target":"/cache"},{"type":"tmpfs","target":"/scratch","size_bytes":4096},{"type":"bind","source":%q,"target":"/host-data","read_only":true,"selinux_label":"shared"}]}`, bindSource)
-	handle, err := d.Create(ctx, driver.Spec{Name: "sdk-fixture", Image: "cauteum-sandbox:local", Workspace: t.TempDir(), Env: []string{"OPENSHELL_OCI_IMAGE_USER=spoofed", "OPENSHELL_SANDBOX_UID=0", "PATH=/usr/bin"}, Labels: map[string]string{"openshell.ai/sandbox-namespace": "spoofed"}, PublishPorts: []driver.PortPublish{{Host: 18080, Guest: 8080}}, DriverConfigJSON: driverConfigJSON})
+	handle, err := d.Create(ctx, driver.Spec{Name: "sdk-fixture", Image: "cautem-sandbox:local", Workspace: t.TempDir(), Env: []string{"OPENSHELL_OCI_IMAGE_USER=spoofed", "OPENSHELL_SANDBOX_UID=0", "PATH=/usr/bin"}, Labels: map[string]string{"openshell.ai/sandbox-namespace": "spoofed"}, PublishPorts: []driver.PortPublish{{Host: 18080, Guest: 8080}}, DriverConfigJSON: driverConfigJSON})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,8 +432,8 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 	}
 	_, err := d.Create(context.Background(), driver.Spec{
 		Name: "go-supervisor", Image: "sandbox:local", Workspace: t.TempDir(),
-		Command: []string{"sleep", "infinity"}, InitBin: makeExecutable("cauteum-init"), PolicyPath: policy,
-		SupervisorBin: makeExecutable("cauteum-supervisor"),
+		Command: []string{"sleep", "infinity"}, InitBin: makeExecutable("cautem-init"), PolicyPath: policy,
+		SupervisorBin: makeExecutable("cautem-supervisor"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -454,14 +454,14 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 	if err := json.Unmarshal(createdJSON, &config); err != nil {
 		t.Fatal(err)
 	}
-	if len(config.Entrypoint) != 1 || config.Entrypoint[0] != "/cautem/cauteum-supervisor" || config.User != "0" {
+	if len(config.Entrypoint) != 1 || config.Entrypoint[0] != "/cautem/cautem-supervisor" || config.User != "0" {
 		t.Fatalf("container entrypoint/user=%v/%q, want Go supervisor PID 1 as root", config.Entrypoint, config.User)
 	}
-	wantArgs := []string{"--", "/cautem/cauteum-init", "--policy", "/cauteum/policy.yaml", "--", "sleep", "infinity"}
+	wantArgs := []string{"--", "/cautem/cautem-init", "--policy", "/cautem/policy.yaml", "--", "sleep", "infinity"}
 	if !slices.Equal(config.Cmd, wantArgs) {
 		t.Fatalf("Go supervisor command=%q, want %q", config.Cmd, wantArgs)
 	}
-	for _, want := range []string{"/cautem/cauteum-supervisor:ro", "/cautem/cauteum-init:ro", "/cauteum/policy.yaml:ro"} {
+	for _, want := range []string{"/cautem/cautem-supervisor:ro", "/cautem/cautem-init:ro", "/cautem/policy.yaml:ro"} {
 		found := false
 		for _, bind := range host.Binds {
 			if strings.HasSuffix(bind, want) {

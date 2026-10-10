@@ -8,13 +8,13 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// PolicyHostPath returns the host path of the sandbox policy bind (label cauteum.policy_path).
+// PolicyHostPath returns the host path of the sandbox policy bind (label cautem.policy_path).
 func (d *Driver) PolicyHostPath(ctx context.Context, nameOrID string) (string, error) {
 	if d == nil || d.cli == nil {
 		return "", fmt.Errorf("docker driver: client not initialized")
 	}
 	name := sanitizeName(nameOrID)
-	for _, ctr := range []string{"cauteum-proxy-" + name, "cauteum-" + name} {
+	for _, ctr := range []string{"cautem-proxy-" + name, "cautem-" + name} {
 		ins, err := d.cli.ContainerInspect(ctx, ctr, client.ContainerInspectOptions{})
 		if err != nil {
 			continue
@@ -23,7 +23,7 @@ func (d *Driver) PolicyHostPath(ctx context.Context, nameOrID string) (string, e
 			return p, nil
 		}
 		for _, m := range ins.Container.Mounts {
-			if m.Destination == "/cauteum/policy.yaml" && m.Source != "" {
+			if m.Destination == "/cautem/policy.yaml" && m.Source != "" {
 				return m.Source, nil
 			}
 		}

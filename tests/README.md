@@ -6,4 +6,4 @@ implementation. The existing legacy engine tests are migration sources; new
 container-backed scenarios must be added under `tests/e2e`.
 
 `tests/internal/testenv` provides the opt-in Alpine and isolated
-Docker-in-Docker fixtures. Enable them with `CAUTEUM_TESTCONTAINERS=1`.
+Docker-in-Docker fixtures. Enable them with `CAUTEM_TESTCONTAINERS=1`.

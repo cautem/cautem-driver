@@ -11,13 +11,13 @@ import (
 )
 
 func TestSocketCandidatesOrder(t *testing.T) {
-	t.Setenv("CAUTEUM_PODMAN_SOCKET", "/tmp/cauteum-podman-test.sock")
+	t.Setenv("CAUTEM_PODMAN_SOCKET", "/tmp/cautem-podman-test.sock")
 	t.Setenv("XDG_RUNTIME_DIR", "/tmp/xdg-runtime-test")
 	c := socketCandidates()
 	if len(c) < 2 {
 		t.Fatalf("candidates=%v", c)
 	}
-	if c[0] != "/tmp/cauteum-podman-test.sock" {
+	if c[0] != "/tmp/cautem-podman-test.sock" {
 		t.Fatalf("first=%q", c[0])
 	}
 	wantXDG := filepath.Join("/tmp/xdg-runtime-test", "podman", "podman.sock")
@@ -158,7 +158,7 @@ func TestConfigFromMapValidatesAndAppliesUpstreamProxySettings(t *testing.T) {
 }
 
 func TestDiscoverSocketMissing(t *testing.T) {
-	t.Setenv("CAUTEUM_PODMAN_SOCKET", "/tmp/definitely-missing-cauteum-podman.sock")
+	t.Setenv("CAUTEM_PODMAN_SOCKET", "/tmp/definitely-missing-cautem-podman.sock")
 	t.Setenv("XDG_RUNTIME_DIR", "/tmp/xdg-missing-"+t.Name())
 	t.Setenv("DOCKER_HOST", "")
 	t.Setenv("CONTAINER_HOST", "")
@@ -168,7 +168,7 @@ func TestDiscoverSocketMissing(t *testing.T) {
 	_, err := DiscoverSocket()
 	if err == nil {
 		// podman CLI may still succeed on developer machines — accept either
-		if _, lookErr := os.Stat("/tmp/definitely-missing-cauteum-podman.sock"); lookErr == nil {
+		if _, lookErr := os.Stat("/tmp/definitely-missing-cautem-podman.sock"); lookErr == nil {
 			t.Fatal("unexpected")
 		}
 	}

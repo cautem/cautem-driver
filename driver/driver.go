@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cautem/cauteum-core"
+	"github.com/cautem/cautem-core"
 )
 
 // SupervisorControlSocketName is mounted inside the shared SSH directory so
@@ -15,7 +15,7 @@ const SupervisorControlSocketName = "supervisor-control.sock"
 
 // Spec describes a sandbox to create.
 type Spec struct {
-	Name      string   // human name → container cauteum-<name>
+	Name      string   // human name → container cautem-<name>
 	Image     string   // default debian:bookworm
 	Workspace string   // absolute host path → /workspace
 	Command   []string // default: sleep infinity
@@ -23,13 +23,13 @@ type Spec struct {
 	IKnow     bool     // override mount deny-list (logged by caller)
 
 	// Egress sidecar (P3). When ProxyBin is set, network is internal and
-	// a dual-homed cauteum-proxy-<name> container is started beside the sandbox.
-	ProxyBin   string   // linux cauteum binary (host path)
+	// a dual-homed cautem-proxy-<name> container is started beside the sandbox.
+	ProxyBin   string   // linux cautem binary (host path)
 	PolicyPath string   // policy YAML mounted read-only into the proxy (+ sandbox)
 	ProxyPort  int      // default defaults.ProxyPort
 	ProxyEnv   []string // real credential KEY=VAL for placeholder rewrite (proxy only)
 
-	// Harden (P4): linux cauteum-init binary mounted at /cautem/cauteum-init; execs are wrapped.
+	// Harden (P4): linux cautem-init binary mounted at /cautem/cautem-init; execs are wrapped.
 	InitBin  string
 	NoHarden bool
 	// SupervisorBin is the Go workload supervisor used as the container entrypoint.
@@ -41,35 +41,35 @@ type Spec struct {
 	DisplayPort     int    // host port; 0 uses defaults.NoVNCPort
 	DisplayPassword string // VNC/noVNC password
 
-	// Labels (P8): arbitrary cauteum.* / user labels on the container.
+	// Labels (P8): arbitrary cautem.* / user labels on the container.
 	Labels map[string]string
 
-	// ExtraHosts entries "host:ip" (Docker ExtraHosts). host.cauteum.internal added by CLI.
+	// ExtraHosts entries "host:ip" (Docker ExtraHosts). host.cautem.internal added by CLI.
 	ExtraHosts []string
 
 	// GatewayURL when set, create registers the sandbox with the control plane.
 	GatewayURL string
 
-	// PersistVolume mounts named volume cauteum-data-<name> at defaults.GuestData (retained across stop/start).
+	// PersistVolume mounts named volume cautem-data-<name> at defaults.GuestData (retained across stop/start).
 	PersistVolume bool
 
-	// EnableSSH mounts cauteum-sshd and shares the root-only relay volume
+	// EnableSSH mounts cautem-sshd and shares the root-only relay volume
 	// (defaults.GuestSSHSocket and sandbox TCP dial socket) with the proxy
 	// sidecar. SSH uses the Unix socket directly; loopback TCP targets are dialed
-	// in the sandbox namespace by cauteum-supervisor. Nothing is host-published;
+	// in the sandbox namespace by cautem-supervisor. Nothing is host-published;
 	// requires ProxyBin.
 	EnableSSH bool
-	SSHBin    string // host path to linux cauteum-sshd
+	SSHBin    string // host path to linux cautem-sshd
 
 	// GPU requests NVIDIA CDI devices into the sandbox (Docker DeviceRequests).
-	// Default device when CDIDevices empty: nvidia.com/gpu=all (override via CAUTEUM_GPU_CDI).
+	// Default device when CDIDevices empty: nvidia.com/gpu=all (override via CAUTEM_GPU_CDI).
 	GPU        bool
 	GPUCount   int      // reserved; CDI list takes precedence in MVP
 	CDIDevices []string // e.g. nvidia.com/gpu=0
 
 	CPU         float64 // NanoCPUs = CPU * 1e9 when > 0
 	MemoryBytes int64   // Docker Memory limit when > 0
-	// PidsLimit is Docker PIDs cgroup limit. 0 → driver default (2048 / CAUTEUM_SANDBOX_PIDS_LIMIT);
+	// PidsLimit is Docker PIDs cgroup limit. 0 → driver default (2048 / CAUTEM_SANDBOX_PIDS_LIMIT);
 	// -1 → unlimited; >0 → explicit.
 	PidsLimit int64
 	// ProxyImage overrides the slim egress sidecar base (default debian:bookworm-slim).

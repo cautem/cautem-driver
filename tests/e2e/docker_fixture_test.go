@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/cautem/cauteum-driver/tests/internal/testenv"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )

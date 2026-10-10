@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright (c) 2026 cauteum
+// SPDX-FileCopyrightText: Copyright (c) 2026 cautem
 // SPDX-License-Identifier: Apache-2.0
 
 package docker
@@ -6,7 +6,7 @@ package docker
 import (
 	"testing"
 
-	"github.com/cautem/cauteum-core/defaults"
+	"github.com/cautem/cautem-core/defaults"
 )
 
 func TestResolveProxyImage(t *testing.T) {

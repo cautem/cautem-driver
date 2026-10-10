@@ -16,7 +16,7 @@ import (
 
 	"github.com/moby/moby/client"
 
-	"github.com/cautem/cauteum-driver/internal/docker"
+	"github.com/cautem/cautem-driver/internal/docker"
 )
 
 const (
@@ -195,7 +195,7 @@ func ResolveHost() (string, error) {
 }
 
 // DiscoverSocket finds a usable podman.sock.
-// Order: CAUTEUM_PODMAN_SOCKET, XDG_RUNTIME_DIR, /run/user/$UID/…,
+// Order: CAUTEM_PODMAN_SOCKET, XDG_RUNTIME_DIR, /run/user/$UID/…,
 // machine sock under HOME, then `podman info`.
 func DiscoverSocket() (string, error) {
 	for _, c := range socketCandidates() {
@@ -206,7 +206,7 @@ func DiscoverSocket() (string, error) {
 	if s, ok := socketFromPodmanInfo(); ok {
 		return s, nil
 	}
-	return "", fmt.Errorf("podman: no API socket found (try: systemctl --user enable --now podman.socket, or set CAUTEUM_PODMAN_SOCKET / DOCKER_HOST)")
+	return "", fmt.Errorf("podman: no API socket found (try: systemctl --user enable --now podman.socket, or set CAUTEM_PODMAN_SOCKET / DOCKER_HOST)")
 }
 
 func socketCandidates() []string {
@@ -221,7 +221,7 @@ func socketCandidates() []string {
 		}
 		out = append(out, p)
 	}
-	add(os.Getenv("CAUTEUM_PODMAN_SOCKET"))
+	add(os.Getenv("CAUTEM_PODMAN_SOCKET"))
 	if xdg := os.Getenv("XDG_RUNTIME_DIR"); xdg != "" {
 		add(filepath.Join(xdg, "podman", "podman.sock"))
 	}

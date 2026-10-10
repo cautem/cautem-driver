@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cautem/cauteum-driver/internal/certbundle"
-	docker "github.com/cautem/cauteum-driver/internal/docker"
+	"github.com/cautem/cautem-driver/internal/certbundle"
+	docker "github.com/cautem/cautem-driver/internal/docker"
 )
 
 const defaultHealthCheckIntervalSecs int64 = 10

@@ -10,11 +10,11 @@ import (
 )
 
 func TestConfigFromMapAppliesSupportedGatewayEngineFields(t *testing.T) {
-	cfg, socket, err := ConfigFromMap(map[string]any{"socket_path": "/var/run/docker.sock", "default_image": "alpine:3.22", "sandbox_namespace": "team-a", "network_name": "openshell", "host_gateway_ip": "127.0.0.1", "sandbox_pids_limit": int64(512), "enable_bind_mounts": true, "grpc_endpoint": "http://gateway:7443", "ssh_socket_path": "/run/cauteum/ssh.sock"})
+	cfg, socket, err := ConfigFromMap(map[string]any{"socket_path": "/var/run/docker.sock", "default_image": "alpine:3.22", "sandbox_namespace": "team-a", "network_name": "openshell", "host_gateway_ip": "127.0.0.1", "sandbox_pids_limit": int64(512), "enable_bind_mounts": true, "grpc_endpoint": "http://gateway:7443", "ssh_socket_path": "/run/cautem/ssh.sock"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if socket != "unix:///var/run/docker.sock" || cfg.DefaultImage != "alpine:3.22" || cfg.SandboxNamespace != "team-a" || cfg.NetworkName != "openshell" || cfg.HostGatewayIP != "127.0.0.1" || cfg.PidsLimit != 512 || !cfg.EnableBindMounts || cfg.GatewayGRPCEndpoint != "http://gateway:7443" || cfg.SandboxSSHSocketPath != "/run/cauteum/ssh.sock" {
+	if socket != "unix:///var/run/docker.sock" || cfg.DefaultImage != "alpine:3.22" || cfg.SandboxNamespace != "team-a" || cfg.NetworkName != "openshell" || cfg.HostGatewayIP != "127.0.0.1" || cfg.PidsLimit != 512 || !cfg.EnableBindMounts || cfg.GatewayGRPCEndpoint != "http://gateway:7443" || cfg.SandboxSSHSocketPath != "/run/cautem/ssh.sock" {
 		t.Fatalf("config=%+v socket=%q", cfg, socket)
 	}
 }

@@ -5,21 +5,21 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cautem/cauteum-core/defaults"
+	"github.com/cautem/cautem-core/defaults"
 )
 
-// OpenShell-aligned guest reserved roots (cauteum control plane + OCI runtime mounts).
+// OpenShell-aligned guest reserved roots (cautem control plane + OCI runtime mounts).
 // Intentionally not a general Linux system-path denylist for host sources —
 // host workspace secrets use denyBasenames / ResolveWorkspace instead.
 var (
-	// controlRoots are in-guest paths owned by cauteum (must not be user-mounted over).
+	// controlRoots are in-guest paths owned by cautem (must not be user-mounted over).
 	controlRoots = []string{
 		defaults.GuestRoot,
 		defaults.GuestEtcOSG,
-		"/run/cauteum",
+		"/run/cautem",
 		"/run/netns",
 		"/var/run/netns",
-		"/var/run/cauteum",
+		"/var/run/cautem",
 	}
 	// ociRuntimeMountRoots must not be used as workspace or user bind targets.
 	ociRuntimeMountRoots = []string{

@@ -27,28 +27,28 @@ import (
 	"archive/tar"
 	"path/filepath"
 
-	"github.com/cautem/cauteum-core"
-	"github.com/cautem/cauteum-core/defaults"
-	"github.com/cautem/cauteum-driver/driver"
-	"github.com/cautem/cauteum-driver/internal/mounts"
-	"github.com/cautem/cauteum-driver/internal/sidecar"
+	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/cautem-driver/internal/mounts"
+	"github.com/cautem/cautem-driver/internal/sidecar"
 )
 
 const (
-	labelSandbox = "cauteum.sandbox"
-	labelName    = "cauteum.name"
-	labelNetwork = "cauteum.network"
-	labelRole    = "cauteum.role"
-	labelInit    = "cauteum.init"
-	labelVolume  = "cauteum.volume"
-	labelSSH     = "cauteum.ssh"
-	labelSSHVol  = "cauteum.ssh_volume"
-	labelPolicy  = "cauteum.policy_path"
+	labelSandbox = "cautem.sandbox"
+	labelName    = "cautem.name"
+	labelNetwork = "cautem.network"
+	labelRole    = "cautem.role"
+	labelInit    = "cautem.init"
+	labelVolume  = "cautem.volume"
+	labelSSH     = "cautem.ssh"
+	labelSSHVol  = "cautem.ssh_volume"
+	labelPolicy  = "cautem.policy_path"
 	roleSandbox  = "sandbox"
 	roleProxy    = "proxy"
 )
 
-// Image and guest layout defaults (aliased from cauteum-core/defaults).
+// Image and guest layout defaults (aliased from cautem-core/defaults).
 const (
 	defaultImage      = defaults.ImageDebian
 	localSandboxImage = defaults.ImageLocal
@@ -128,7 +128,7 @@ func New() (*Driver, error) {
 }
 
 // HostGatewayExtraHosts maps OpenShell-style host-gateway aliases into containers.
-// Canonical callback is host.cauteum.internal (cf. host.openshell.internal). On Linux,
+// Canonical callback is host.cautem.internal (cf. host.openshell.internal). On Linux,
 // host.docker.internal is also mapped so Desktop/Linux compose parity holds —
 // same pair OpenShell documents under extra_hosts.
 func HostGatewayExtraHosts() []string {
@@ -217,10 +217,10 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	}
 	netPrefix := strings.TrimSpace(d.runtimeConfig.NetworkName)
 	if netPrefix == "" {
-		netPrefix = "cauteum-net"
+		netPrefix = "cautem-net"
 	}
 	netName := netPrefix + "-" + name
-	ctrName := "cauteum-" + name
+	ctrName := "cautem-" + name
 	withProxy := strings.TrimSpace(spec.ProxyBin) != ""
 	withSupervisor := strings.TrimSpace(spec.SupervisorBin) != ""
 	var caVol string
@@ -246,7 +246,7 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		if _, err := os.Stat(spec.SSHBin); err != nil {
 			return driver.Handle{}, fmt.Errorf("docker ssh bin: %w", err)
 		}
-		sshVol = "cauteum-ssh-" + name
+		sshVol = "cautem-ssh-" + name
 		if withSupervisor {
 			tcpDialSocket = filepath.Join(filepath.Dir(d.sandboxSSHSocketPath()), "tcp-forward.sock")
 		}
@@ -308,8 +308,8 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		if port <= 0 {
 			port = defaultProxy
 		}
-		proxyHost := "cauteum-proxy-" + name
-		caVol = "cauteum-ca-" + name
+		proxyHost := "cautem-proxy-" + name
+		caVol = "cautem-ca-" + name
 		created, err := d.ensureVolume(ctx, caVol)
 		if err != nil {
 			return driver.Handle{}, err
@@ -346,7 +346,7 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	}
 	if caVol != "" {
 		binds = append(binds, caVol+":"+defaults.GuestCADir+":ro")
-		labels["cauteum.ca_volume"] = caVol
+		labels["cautem.ca_volume"] = caVol
 	}
 	for k, v := range spec.Labels {
 		k = strings.TrimSpace(k)
@@ -359,29 +359,29 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		labels["openshell.ai/sandbox-namespace"] = namespace
 	}
 	if spec.PersistVolume {
-		volName := "cauteum-data-" + name
+		volName := "cautem-data-" + name
 		if _, err := d.ensureVolume(ctx, volName); err != nil {
 			return driver.Handle{}, err
 		}
 		binds = append(binds, volName+":"+guestDataPath+":rw")
 		labels[labelVolume] = volName
 		env = mergeEnv(env, []string{
-			"CAUTEUM_DATA=" + guestDataPath,
+			"CAUTEM_DATA=" + guestDataPath,
 			"HOME=" + guestHomePath,
 			"PATH=" + guestPath,
 		})
 		if d.runtimeConfig.ReconcileDataOwnership {
-			env = mergeEnv(env, []string{"CAUTEUM_RECONCILE_DATA_OWNERSHIP=1"})
+			env = mergeEnv(env, []string{"CAUTEM_RECONCILE_DATA_OWNERSHIP=1"})
 		}
 	}
 	if !spec.NoHarden && strings.TrimSpace(spec.InitBin) != "" {
 		if _, err := os.Stat(spec.InitBin); err != nil {
 			return driver.Handle{}, fmt.Errorf("docker init bin: %w", err)
 		}
-		binds = append(binds, spec.InitBin+":/cautem/cauteum-init:ro")
+		binds = append(binds, spec.InitBin+":/cautem/cautem-init:ro")
 		if spec.PolicyPath != "" {
-			binds = append(binds, spec.PolicyPath+":/cauteum/policy.yaml:ro")
-			env = mergeEnv(env, []string{"CAUTEUM_POLICY=/cauteum/policy.yaml"})
+			binds = append(binds, spec.PolicyPath+":/cautem/policy.yaml:ro")
+			env = mergeEnv(env, []string{"CAUTEM_POLICY=/cautem/policy.yaml"})
 			if abs, err := filepath.Abs(spec.PolicyPath); err == nil {
 				labels[labelPolicy] = abs
 			} else {
@@ -392,9 +392,9 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	}
 	if withSupervisor {
 		binds = append(binds,
-			spec.SupervisorBin+":/cautem/cauteum-supervisor:ro",
+			spec.SupervisorBin+":/cautem/cautem-supervisor:ro",
 		)
-		labels["cauteum.supervisor"] = "go"
+		labels["cautem.supervisor"] = "go"
 	}
 	if sshVol != "" {
 		binds = append(binds,
@@ -403,11 +403,11 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		labels[labelSSH] = "1"
 		labels[labelSSHVol] = sshVol
 		if tcpDialSocket != "" {
-			env = mergeEnv(env, []string{"CAUTEUM_RELAY_TARGET_SOCKET=" + tcpDialSocket})
+			env = mergeEnv(env, []string{"CAUTEM_RELAY_TARGET_SOCKET=" + tcpDialSocket})
 		}
 		if withSupervisor && strings.TrimSpace(d.runtimeConfig.GatewayGRPCEndpoint) != "" {
 			controlSocket := filepath.Join(filepath.Dir(d.sandboxSSHSocketPath()), driver.SupervisorControlSocketName)
-			env = mergeEnv(env, []string{"CAUTEUM_SUPERVISOR_CONTROL_SOCKET=" + controlSocket})
+			env = mergeEnv(env, []string{"CAUTEM_SUPERVISOR_CONTROL_SOCKET=" + controlSocket})
 		}
 	}
 
@@ -419,7 +419,7 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		}
 		pass := strings.TrimSpace(spec.DisplayPassword)
 		if pass == "" {
-			pass = "cauteum"
+			pass = "cautem"
 		}
 		hostPort := spec.DisplayPort
 		if hostPort <= 0 {
@@ -428,22 +428,22 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		env = mergeEnv(env, []string{
 			"DISPLAY_MODE=novnc",
 			"DISPLAY=:99",
-			"CAUTEUM_VNC_PASSWORD=" + pass,
-			fmt.Sprintf("CAUTEUM_NOVNC_PORT=%d", defaultNoVNCPort),
+			"CAUTEM_VNC_PASSWORD=" + pass,
+			fmt.Sprintf("CAUTEM_NOVNC_PORT=%d", defaultNoVNCPort),
 		})
-		labels["cauteum.display"] = "novnc"
-		labels["cauteum.display.port"] = strconv.Itoa(hostPort)
+		labels["cautem.display"] = "novnc"
+		labels["cautem.display.port"] = strconv.Itoa(hostPort)
 	}
 
 	cmd := spec.Command
 	if len(cmd) == 0 {
 		switch {
 		case withDisplay && usesEmbeddedInit(img):
-			cmd = []string{"--", "/usr/local/bin/cauteum-gui-boot"}
+			cmd = []string{"--", "/usr/local/bin/cautem-gui-boot"}
 		case usesEmbeddedInit(img):
 			cmd = []string{"--", "sleep", "infinity"}
 		case withDisplay:
-			cmd = []string{"/usr/local/bin/cauteum-gui-boot"}
+			cmd = []string{"/usr/local/bin/cautem-gui-boot"}
 		default:
 			cmd = []string{"sleep", "infinity"}
 		}
@@ -465,23 +465,23 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	if !spec.NoHarden && (strings.TrimSpace(spec.InitBin) != "" || usesEmbeddedInit(img)) {
 		cfg.User = "0"
 	}
-	// Prefer host-mounted cauteum-init over whatever ENTRYPOINT the image baked
+	// Prefer host-mounted cautem-init over whatever ENTRYPOINT the image baked
 	// (legacy osg-init looked for /osg/policy.yaml and dies on rename).
 	if !spec.NoHarden && strings.TrimSpace(spec.InitBin) != "" {
-		cfg.Entrypoint = []string{"/cautem/cauteum-init"}
+		cfg.Entrypoint = []string{"/cautem/cautem-init"}
 		if len(spec.Command) == 0 && !usesEmbeddedInit(img) && !withDisplay {
 			// Image has no init wrapper — Cmd is the payload after "--".
 			cfg.Cmd = append([]string{"--"}, cmd...)
 		} else if len(spec.Command) == 0 && !usesEmbeddedInit(img) && withDisplay {
-			cfg.Cmd = []string{"--", "/usr/local/bin/cauteum-gui-boot"}
+			cfg.Cmd = []string{"--", "/usr/local/bin/cautem-gui-boot"}
 		}
 	}
 	if withSupervisor {
 		// The Go PID 1 supervisor owns workload lifecycle and signal handling.
 		// The hardened init remains the child entrypoint and applies Landlock
 		// plus the checked identity drop before execing the agent command.
-		cfg.Entrypoint = []string{"/cautem/cauteum-supervisor"}
-		cfg.Cmd = append([]string{"--", "/cautem/cauteum-init", "--policy", "/cauteum/policy.yaml", "--"}, workloadCmd...)
+		cfg.Entrypoint = []string{"/cautem/cautem-supervisor"}
+		cfg.Cmd = append([]string{"--", "/cautem/cautem-init", "--policy", "/cautem/policy.yaml", "--"}, workloadCmd...)
 		cfg.User = "0"
 	}
 	host := &container.HostConfig{
@@ -620,7 +620,7 @@ func (d *Driver) printContainerDiagnostics(ctx context.Context, id string) {
 }
 
 // ensureGuestLayout creates durable home/bin under GuestData for agent installs.
-// Uses a raw docker exec (no cauteum-init wrap) so layout works before harden paths matter.
+// Uses a raw docker exec (no cautem-init wrap) so layout works before harden paths matter.
 func (d *Driver) ensureGuestLayout(ctx context.Context, id string) error {
 	info, err := d.cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil || info.Container.Config == nil {
@@ -635,7 +635,7 @@ func (d *Driver) ensureGuestLayout(ctx context.Context, id string) error {
 	script := "mkdir -p " + guestHomePath + "/.local/bin " + guestBinPath + " /etc/profile.d && " +
 		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > " + guestHomePath + "/.profile && " +
 		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > " + guestHomePath + "/.bashrc && " +
-		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > /etc/profile.d/cauteum-path.sh"
+		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > /etc/profile.d/cautem-path.sh"
 	execID, err := d.cli.ExecCreate(ctx, id, client.ExecCreateOptions{
 		Cmd:          []string{"/bin/bash", "-c", script},
 		AttachStdout: true,
@@ -681,11 +681,11 @@ func (d *Driver) Stop(ctx context.Context, id core.ID) error {
 }
 
 // Exec runs a command in the container. With TTY, attaches stdin/stdout in raw mode.
-// When the sandbox was created with cauteum-init, argv is wrapped: cauteum-init -- <cmd>.
+// When the sandbox was created with cautem-init, argv is wrapped: cautem-init -- <cmd>.
 //
 // Docker ExecCreate Env replaces the process environment when non-empty.
 // We always merge the container's Config.Env first so HTTP_PROXY / CA / HOME from
-// create survive (otherwise `cauteum exec` / create `-- agent` cannot reach the sidecar).
+// create survive (otherwise `cautem exec` / create `-- agent` cannot reach the sidecar).
 func (d *Driver) Exec(ctx context.Context, id core.ID, req driver.ExecRequest) (driver.ExecResult, error) {
 	if len(req.Argv) == 0 {
 		return driver.ExecResult{}, fmt.Errorf("docker exec: empty argv")
@@ -706,7 +706,7 @@ func (d *Driver) Exec(ctx context.Context, id core.ID, req driver.ExecRequest) (
 	{
 		containerEnv = append([]string{}, info.Container.Config.Env...)
 		if info.Container.Config.Labels[labelInit] == "1" {
-			argv = append([]string{"/cautem/cauteum-init", "--"}, req.Argv...)
+			argv = append([]string{"/cautem/cautem-init", "--"}, req.Argv...)
 		}
 		// Proxy sidecar has no /workspace mount; exec must not chdir there.
 		if info.Container.Config.Labels[labelRole] == roleProxy {
@@ -864,7 +864,7 @@ func resizeExecOnce(ctx context.Context, cli *client.Client, execID string, inFd
 	})
 }
 
-// Delete removes sandbox container, proxy sidecar, cauteum network, and data volume.
+// Delete removes sandbox container, proxy sidecar, cautem network, and data volume.
 func (d *Driver) Delete(ctx context.Context, id core.ID) error {
 	info, err := d.cli.ContainerInspect(ctx, string(id), client.ContainerInspectOptions{})
 	if err != nil {
@@ -873,7 +873,7 @@ func (d *Driver) Delete(ctx context.Context, id core.ID) error {
 	netName := info.Container.Config.Labels[labelNetwork]
 	name := info.Container.Config.Labels[labelName]
 	volName := info.Container.Config.Labels[labelVolume]
-	caVol := info.Container.Config.Labels["cauteum.ca_volume"]
+	caVol := info.Container.Config.Labels["cautem.ca_volume"]
 	sshVol := info.Container.Config.Labels[labelSSHVol]
 	_, _ = d.cli.ContainerRemove(ctx, string(id), client.ContainerRemoveOptions{Force: true})
 	if name != "" {
@@ -894,7 +894,7 @@ func (d *Driver) Delete(ctx context.Context, id core.ID) error {
 	return nil
 }
 
-// List returns cauteum sandbox containers (excludes proxy sidecars).
+// List returns cautem sandbox containers (excludes proxy sidecars).
 func (d *Driver) List(ctx context.Context) ([]driver.Info, error) {
 	f := client.Filters{}
 	f.Add("label", labelSandbox+"=1")
@@ -928,20 +928,20 @@ func (d *Driver) Inspect(ctx context.Context, nameOrID string) (driver.Info, err
 	if nameOrID == "" {
 		return driver.Info{}, fmt.Errorf("docker inspect: empty name")
 	}
-	// Try container name cauteum-<name>
-	candidates := []string{nameOrID, "cauteum-" + nameOrID}
+	// Try container name cautem-<name>
+	candidates := []string{nameOrID, "cautem-" + nameOrID}
 	for _, id := range candidates {
 		c, err := d.cli.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 		if err != nil {
 			continue
 		}
-		if c.Container.Config.Labels[labelSandbox] != "1" && !strings.HasPrefix(strings.TrimPrefix(c.Container.Name, "/"), "cauteum-") {
+		if c.Container.Config.Labels[labelSandbox] != "1" && !strings.HasPrefix(strings.TrimPrefix(c.Container.Name, "/"), "cautem-") {
 			continue
 		}
 		name := c.Container.Config.Labels[labelName]
 		if name == "" {
 			name = strings.TrimPrefix(c.Container.Name, "/")
-			name = strings.TrimPrefix(name, "cauteum-")
+			name = strings.TrimPrefix(name, "cautem-")
 		}
 		return driver.Info{
 			ID:      core.ID(c.Container.ID),
@@ -954,7 +954,7 @@ func (d *Driver) Inspect(ctx context.Context, nameOrID string) (driver.Info, err
 	return driver.Info{}, fmt.Errorf("docker inspect: sandbox %q not found", nameOrID)
 }
 
-// ContainerIP returns the sandbox container IP on its cauteum network.
+// ContainerIP returns the sandbox container IP on its cautem network.
 func (d *Driver) ContainerIP(ctx context.Context, containerID, networkName string) (string, error) {
 	if d == nil || d.cli == nil {
 		return "", fmt.Errorf("docker driver: client not initialized")
@@ -1012,10 +1012,10 @@ func (d *Driver) Logs(ctx context.Context, id core.ID, follow bool, w io.Writer)
 	if info, err := d.cli.ContainerInspect(ctx, string(id), client.ContainerInspectOptions{}); err == nil && info.Container.Config != nil {
 		name := info.Container.Config.Labels[labelName]
 		if name == "" {
-			name = strings.TrimPrefix(strings.TrimPrefix(info.Container.Name, "/"), "cauteum-")
+			name = strings.TrimPrefix(strings.TrimPrefix(info.Container.Name, "/"), "cautem-")
 		}
 		if name != "" {
-			proxyName := "cauteum-proxy-" + name
+			proxyName := "cautem-proxy-" + name
 			if _, err := d.cli.ContainerInspect(ctx, proxyName, client.ContainerInspectOptions{}); err == nil {
 				sources = append(sources, src{id: proxyName, prefix: "proxy"})
 			}
@@ -1103,7 +1103,7 @@ func (d *Driver) ensureVolume(ctx context.Context, name string) (bool, error) {
 	if err == nil {
 		return false, nil
 	}
-	_, err = d.cli.VolumeCreate(ctx, client.VolumeCreateOptions{Name: name, Labels: map[string]string{"cauteum.volume": "1"}})
+	_, err = d.cli.VolumeCreate(ctx, client.VolumeCreateOptions{Name: name, Labels: map[string]string{"cautem.volume": "1"}})
 	if err != nil {
 		return false, fmt.Errorf("docker volume create %s: %w", name, err)
 	}
@@ -1338,7 +1338,7 @@ func rejectExistingSymlink(root *os.Root, name string) error {
 	return nil
 }
 
-// EnsureSSHDaemon starts cauteum-sshd as root on the relay socket
+// EnsureSSHDaemon starts cautem-sshd as root on the relay socket
 // (idempotent: sshd exits when a live daemon already owns the socket) and
 // waits until the socket exists. Returns driver.ErrSSHDisabled for sandboxes
 // created without SSH.
@@ -1380,7 +1380,7 @@ func (d *Driver) EnsureSSHDaemon(ctx context.Context, id core.ID) error {
 	return fmt.Errorf("sshd socket %s did not appear (see %s)", sshSocket, defaults.GuestSSHLog)
 }
 
-// rawExec runs argv as root without the cauteum-init wrapper.
+// rawExec runs argv as root without the cautem-init wrapper.
 func (d *Driver) rawExec(ctx context.Context, id string, argv []string) (int, error) {
 	execID, err := d.cli.ExecCreate(ctx, id, client.ExecCreateOptions{
 		Cmd:          argv,
@@ -1475,16 +1475,16 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 	if _, err := os.Stat(policyPath); err != nil {
 		return fmt.Errorf("docker proxy policy: %w", err)
 	}
-	ctrName := "cauteum-proxy-" + name
+	ctrName := "cautem-proxy-" + name
 
 	binds := []string{
-		binPath + ":/cauteum/cauteum:ro",
-		policyPath + ":/cauteum/policy.yaml:ro",
+		binPath + ":/cautem/cautem:ro",
+		policyPath + ":/cautem/policy.yaml:ro",
 	}
 	for _, entry := range []struct{ source, target string }{
-		{d.runtimeConfig.UpstreamProxyAuthFile, "/run/cauteum/upstream-proxy/auth"},
-		{d.runtimeConfig.UpstreamProxyCABundle, "/run/cauteum/upstream-proxy/ca.pem"},
-		{d.runtimeConfig.EgressCABundle, "/run/cauteum/egress-ca/ca.pem"},
+		{d.runtimeConfig.UpstreamProxyAuthFile, "/run/cautem/upstream-proxy/auth"},
+		{d.runtimeConfig.UpstreamProxyCABundle, "/run/cautem/upstream-proxy/ca.pem"},
+		{d.runtimeConfig.EgressCABundle, "/run/cautem/egress-ca/ca.pem"},
 	} {
 		if entry.source == "" {
 			continue
@@ -1513,38 +1513,38 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 			}
 		}
 		binds = append(binds,
-			d.runtimeConfig.GuestTLSCA+":/run/cauteum/gateway-tls/ca.pem:ro",
-			d.runtimeConfig.GuestTLSCert+":/run/cauteum/gateway-tls/cert.pem:ro",
-			d.runtimeConfig.GuestTLSKey+":/run/cauteum/gateway-tls/key.pem:ro",
+			d.runtimeConfig.GuestTLSCA+":/run/cautem/gateway-tls/ca.pem:ro",
+			d.runtimeConfig.GuestTLSCert+":/run/cautem/gateway-tls/cert.pem:ro",
+			d.runtimeConfig.GuestTLSKey+":/run/cautem/gateway-tls/key.pem:ro",
 		)
 	}
 	cmd := []string{
 		"proxy",
 		"--listen", fmt.Sprintf("0.0.0.0:%d", port),
-		"--policy", "/cauteum/policy.yaml",
+		"--policy", "/cautem/policy.yaml",
 	}
 	if caVol != "" {
-		binds = append(binds, caVol+":/cauteum/ca:rw")
-		cmd = append(cmd, "--ca-out", "/cauteum/ca/ca.pem")
+		binds = append(binds, caVol+":/cautem/ca:rw")
+		cmd = append(cmd, "--ca-out", "/cautem/ca/ca.pem")
 	}
 	env := append([]string{}, proxyEnv...)
 	env = mergeEnv(env, d.upstreamProxyEnv())
 	env = mergeEnv(env, d.egressTrustEnv())
 	if d.runtimeConfig.GuestTLSCA != "" {
 		env = mergeEnv(env, []string{
-			"CAUTEUM_GUEST_TLS_CA=/run/cauteum/gateway-tls/ca.pem",
-			"CAUTEUM_GUEST_TLS_CERT=/run/cauteum/gateway-tls/cert.pem",
-			"CAUTEUM_GUEST_TLS_KEY=/run/cauteum/gateway-tls/key.pem",
+			"CAUTEM_GUEST_TLS_CA=/run/cautem/gateway-tls/ca.pem",
+			"CAUTEM_GUEST_TLS_CERT=/run/cautem/gateway-tls/cert.pem",
+			"CAUTEM_GUEST_TLS_KEY=/run/cautem/gateway-tls/key.pem",
 		})
 	}
 	if d.runtimeConfig.ProviderSPIFFEWorkloadAPISocket != "" {
-		env = mergeEnv(env, []string{"CAUTEUM_PROVIDER_SPIFFE_WORKLOAD_API_SOCKET=" + d.runtimeConfig.ProviderSPIFFEWorkloadAPISocket})
+		env = mergeEnv(env, []string{"CAUTEM_PROVIDER_SPIFFE_WORKLOAD_API_SOCKET=" + d.runtimeConfig.ProviderSPIFFEWorkloadAPISocket})
 	}
 	if d.runtimeConfig.GatewayGRPCEndpoint != "" {
-		env = mergeEnv(env, []string{"CAUTEUM_GATEWAY_GRPC_ENDPOINT=" + d.runtimeConfig.GatewayGRPCEndpoint})
+		env = mergeEnv(env, []string{"CAUTEM_GATEWAY_GRPC_ENDPOINT=" + d.runtimeConfig.GatewayGRPCEndpoint})
 	}
 	if d.runtimeConfig.GatewayGRPCPort > 0 {
-		env = mergeEnv(env, []string{fmt.Sprintf("CAUTEUM_GATEWAY_GRPC_PORT=%d", d.runtimeConfig.GatewayGRPCPort)})
+		env = mergeEnv(env, []string{fmt.Sprintf("CAUTEM_GATEWAY_GRPC_PORT=%d", d.runtimeConfig.GatewayGRPCPort)})
 	}
 	if socketPath, err := providerWorkloadSocket(env); err != nil {
 		return fmt.Errorf("docker proxy SPIFFE socket: %w", err)
@@ -1559,13 +1559,13 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 		}
 		sshDir := filepath.Dir(sshSocket)
 		binds = append(binds, sshVol+":"+sshDir+":rw")
-		env = mergeEnv(env, []string{"CAUTEUM_SSH_SOCKET=" + sshSocket, "CAUTEUM_SANDBOX=" + name})
+		env = mergeEnv(env, []string{"CAUTEM_SSH_SOCKET=" + sshSocket, "CAUTEM_SANDBOX=" + name})
 		if strings.TrimSpace(d.runtimeConfig.GatewayGRPCEndpoint) != "" {
 			controlSocket := filepath.Join(sshDir, driver.SupervisorControlSocketName)
-			env = mergeEnv(env, []string{"CAUTEUM_SUPERVISOR_CONTROL_SOCKET=" + controlSocket})
+			env = mergeEnv(env, []string{"CAUTEM_SUPERVISOR_CONTROL_SOCKET=" + controlSocket})
 		}
 		if tcpDialSocket != "" {
-			env = mergeEnv(env, []string{"CAUTEUM_TCP_DIAL_SOCKET=" + tcpDialSocket})
+			env = mergeEnv(env, []string{"CAUTEM_TCP_DIAL_SOCKET=" + tcpDialSocket})
 		}
 	}
 
@@ -1575,9 +1575,9 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 	}
 	cfg := &container.Config{
 		Image: img,
-		// Agent images (cursor/claude) set ENTRYPOINT=/usr/local/bin/cauteum-init — that must
+		// Agent images (cursor/claude) set ENTRYPOINT=/usr/local/bin/cautem-init — that must
 		// NOT wrap the sidecar. Entrypoint is the mounted linux CLI; Cmd is proxy args.
-		Entrypoint: []string{"/cauteum/cauteum"},
+		Entrypoint: []string{"/cautem/cautem"},
 		Cmd:        cmd,
 		Env:        env,
 		Labels: map[string]string{
@@ -1591,8 +1591,8 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 			proxyPort: {},
 		},
 	}
-	// OpenShell-style: host.cauteum.internal → host-gateway so the sidecar can
-	// ResolveSecrets from cauteum-gateway on the host (no runtime hostname fallback).
+	// OpenShell-style: host.cautem.internal → host-gateway so the sidecar can
+	// ResolveSecrets from cautem-gateway on the host (no runtime hostname fallback).
 	host := &container.HostConfig{
 		Binds:       binds,
 		NetworkMode: container.NetworkMode(netName),
@@ -1604,7 +1604,7 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 	}
 	networking := &network.NetworkingConfig{
 		EndpointsConfig: map[string]*network.EndpointSettings{
-			netName: {Aliases: []string{"cauteum-proxy", ctrName}},
+			netName: {Aliases: []string{"cautem-proxy", ctrName}},
 		},
 	}
 	resp, err := d.cli.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: host, NetworkingConfig: networking, Name: ctrName})
@@ -1639,7 +1639,7 @@ func (d *Driver) waitProxyCA(ctx context.Context, proxyID string, timeout time.D
 	var lastErr error
 	for time.Now().Before(deadline) {
 		res, err := d.Exec(ctx, core.ID(proxyID), driver.ExecRequest{
-			Argv: []string{"test", "-s", "/cauteum/ca/ca.pem"},
+			Argv: []string{"test", "-s", "/cautem/ca/ca.pem"},
 		})
 		if err == nil && res.ExitCode == 0 {
 			return nil
@@ -1659,9 +1659,9 @@ func (d *Driver) waitProxyCA(ctx context.Context, proxyID string, timeout time.D
 	}
 	detail := strings.TrimSpace(buf.String())
 	if detail != "" {
-		return fmt.Errorf("docker proxy: timed out waiting for /cauteum/ca/ca.pem (last exec: %v)\nproxy logs:\n%s", lastErr, detail)
+		return fmt.Errorf("docker proxy: timed out waiting for /cautem/ca/ca.pem (last exec: %v)\nproxy logs:\n%s", lastErr, detail)
 	}
-	return fmt.Errorf("docker proxy: timed out waiting for /cauteum/ca/ca.pem (last exec: %v)", lastErr)
+	return fmt.Errorf("docker proxy: timed out waiting for /cautem/ca/ca.pem (last exec: %v)", lastErr)
 }
 
 // waitProxyListening waits until the sidecar accepts TCP on 127.0.0.1:port.
@@ -1700,7 +1700,7 @@ func (d *Driver) waitProxyListening(ctx context.Context, proxyID string, port in
 }
 
 func (d *Driver) removeProxySidecar(ctx context.Context, name string) error {
-	ctrName := "cauteum-proxy-" + name
+	ctrName := "cautem-proxy-" + name
 	_, _ = d.cli.ContainerRemove(ctx, ctrName, client.ContainerRemoveOptions{Force: true})
 	return nil
 }
@@ -1768,7 +1768,7 @@ func (d *Driver) ensureImage(ctx context.Context, ref string) error {
 		return fmt.Errorf("docker image %s is not available locally and image_pull_policy is never", ref)
 	}
 	low := strings.ToLower(ref)
-	if low == localSandboxImage || low == guiSandboxImage || low == gpuSandboxImage || strings.HasPrefix(low, "cauteum-sandbox:") {
+	if low == localSandboxImage || low == guiSandboxImage || low == gpuSandboxImage || strings.HasPrefix(low, "cautem-sandbox:") {
 		remote, published := defaults.PublishedImage(low)
 		var pullErr error
 		if published && !strings.EqualFold(os.Getenv(defaults.EnvImagePull), "never") {
@@ -1861,7 +1861,7 @@ func (d *Driver) defaultSandboxImage(ctx context.Context, displayMode string, gp
 
 func usesEmbeddedInit(img string) bool {
 	img = strings.TrimSpace(strings.ToLower(img))
-	return img == localSandboxImage || img == guiSandboxImage || strings.HasPrefix(img, "cauteum-sandbox:")
+	return img == localSandboxImage || img == guiSandboxImage || strings.HasPrefix(img, "cautem-sandbox:")
 }
 
 func imageHasGUI(img string) bool {
@@ -1869,7 +1869,7 @@ func imageHasGUI(img string) bool {
 	if img == guiSandboxImage || strings.Contains(img, ":gui") {
 		return true
 	}
-	// Heuristic: inspect for cauteum-gui-boot via missing path is hard; require known tags.
+	// Heuristic: inspect for cautem-gui-boot via missing path is hard; require known tags.
 	return false
 }
 
@@ -1896,7 +1896,7 @@ func sanitizeName(name string) string {
 	return s
 }
 
-// RunProbe runs cauteum-init --probe in a one-shot helper container (Landlock ABI).
+// RunProbe runs cautem-init --probe in a one-shot helper container (Landlock ABI).
 func (d *Driver) RunProbe(ctx context.Context, initBin string) (string, error) {
 	if d == nil || d.cli == nil {
 		return "", fmt.Errorf("docker client not initialized")
@@ -1906,11 +1906,11 @@ func (d *Driver) RunProbe(ctx context.Context, initBin string) (string, error) {
 	}
 	cfg := &container.Config{
 		Image:      defaultImage,
-		Cmd:        []string{"/cautem/cauteum-init", "--probe"},
+		Cmd:        []string{"/cautem/cautem-init", "--probe"},
 		WorkingDir: "/",
 	}
 	host := &container.HostConfig{
-		Binds: []string{initBin + ":/cautem/cauteum-init:ro"},
+		Binds: []string{initBin + ":/cautem/cautem-init:ro"},
 		// AutoRemove handled after wait
 	}
 	resp, err := d.cli.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: host, NetworkingConfig: nil, Name: ""})
