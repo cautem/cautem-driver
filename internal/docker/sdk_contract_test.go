@@ -35,6 +35,22 @@ func sdkFixtureDriver(t *testing.T, handler http.HandlerFunc) *Driver {
 	return NewFromClient(cli)
 }
 
+func TestDefaultSandboxImageUsesCautemBaseWhenNotCached(t *testing.T) {
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/images/") {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"not found"}`)
+			return
+		}
+		t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	if got := d.defaultSandboxImage(context.Background(), "", false); got != localSandboxImage {
+		t.Fatalf("default sandbox image = %q, want %q", got, localSandboxImage)
+	}
+}
+
 func TestSplitSDKLogsAndArchiveEngineContract(t *testing.T) {
 	const content = "archive data"
 	var archive bytes.Buffer

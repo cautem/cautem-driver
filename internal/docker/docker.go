@@ -1838,7 +1838,7 @@ func (d *Driver) pullAs(ctx context.Context, remote, local string) error {
 
 func (d *Driver) defaultSandboxImage(ctx context.Context, displayMode string, gpu bool) string {
 	if d == nil || d.cli == nil {
-		return defaultImage
+		return localSandboxImage
 	}
 	if strings.EqualFold(strings.TrimSpace(displayMode), "novnc") {
 		if _, err := d.cli.ImageInspect(ctx, guiSandboxImage); err == nil {
@@ -1852,11 +1852,10 @@ func (d *Driver) defaultSandboxImage(ctx context.Context, displayMode string, gp
 		}
 		return gpuSandboxImage
 	}
-	_, err := d.cli.ImageInspect(ctx, localSandboxImage)
-	if err == nil {
-		return localSandboxImage
-	}
-	return defaultImage
+	// The generic Debian base lacks the sandbox account and cautem-init
+	// required by the default hardening policy. Let ensureImage pull the
+	// published cautem base when it is not already available locally.
+	return localSandboxImage
 }
 
 func usesEmbeddedInit(img string) bool {
