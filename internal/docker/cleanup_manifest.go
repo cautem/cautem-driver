@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/moby/moby/client"
@@ -53,7 +54,7 @@ func (d *Driver) saveCleanupManifest(manifest cleanupManifest) error {
 		return fmt.Errorf("create Docker cleanup manifest directory: %w", err)
 	}
 	dirInfo, err := os.Lstat(d.runtimeConfig.CleanupManifestDir)
-	if err != nil || !dirInfo.IsDir() || dirInfo.Mode()&os.ModeSymlink != 0 || dirInfo.Mode().Perm()&0o077 != 0 {
+	if err != nil || !isPrivateCleanupDirectory(dirInfo) {
 		return fmt.Errorf("docker cleanup manifest directory is not a real directory")
 	}
 	if err := syncDirectory(filepath.Dir(d.runtimeConfig.CleanupManifestDir)); err != nil {
@@ -122,7 +123,7 @@ func readCleanupManifest(path, expectedID string) (cleanupManifest, error) {
 	if err != nil {
 		return cleanupManifest{}, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0o077 != 0 {
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
 		return cleanupManifest{}, fmt.Errorf("docker cleanup manifest is not a private regular file")
 	}
 	file, err := os.Open(path)
@@ -158,6 +159,11 @@ func (d *Driver) removeCleanupManifest(id string) error {
 }
 
 func syncDirectory(path string) error {
+	// Windows does not support opening directories for FlushFileBuffers through
+	// os.File.Sync. The manifest file itself is synced before it is linked.
+	if runtime.GOOS == "windows" {
+		return nil
+	}
 	dir, err := os.Open(path)
 	if err != nil {
 		return err
@@ -167,6 +173,15 @@ func syncDirectory(path string) error {
 		return err
 	}
 	return dir.Close()
+}
+
+func isPrivateCleanupDirectory(info os.FileInfo) bool {
+	if info == nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return false
+	}
+	// Windows does not expose ACLs through FileMode.Perm. The directory inherits
+	// the ACL of its configured parent; ownership labels still constrain cleanup.
+	return runtime.GOOS == "windows" || info.Mode().Perm()&0o077 == 0
 }
 
 func cleanupManifestFromLabels(id string, labels map[string]string) (cleanupManifest, error) {

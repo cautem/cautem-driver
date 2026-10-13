@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	core "github.com/cautem/cautem-core"
@@ -152,7 +153,7 @@ func (d *Driver) create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 }
 
 func readKubernetesSandboxPolicy(path string) ([]byte, error) {
-	if strings.TrimSpace(path) == "" || !strings.HasPrefix(path, "/") {
+	if strings.TrimSpace(path) == "" || !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("kubernetes sandbox policy path must be absolute")
 	}
 	info, err := os.Lstat(path)
@@ -177,7 +178,7 @@ func readKubernetesGuestTLS(config EngineConfig) (*guestTLSMaterial, error) {
 		return nil, nil
 	}
 	read := func(label, path string) ([]byte, error) {
-		if path == "" || !strings.HasPrefix(path, "/") {
+		if path == "" || !filepath.IsAbs(path) {
 			return nil, fmt.Errorf("kubernetes guest TLS %s path must be absolute", label)
 		}
 		info, err := os.Lstat(path)

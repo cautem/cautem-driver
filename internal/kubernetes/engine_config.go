@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -182,7 +183,7 @@ func (config EngineConfig) Validate() error {
 	}
 	if config.GuestTLSCA != "" && config.GuestTLSCert != "" && config.GuestTLSKey != "" {
 		for _, path := range []string{config.GuestTLSCA, config.GuestTLSCert, config.GuestTLSKey} {
-			if !strings.HasPrefix(path, "/") {
+			if !filepath.IsAbs(path) {
 				return fmt.Errorf("kubernetes guest TLS file paths must be absolute")
 			}
 		}
