@@ -2,6 +2,7 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	core "github.com/cautem/cautem-core"
+	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
 
@@ -106,12 +108,11 @@ func (d *Driver) ensureGuestLayout(ctx context.Context, id string) error {
 	if info.Container.Config.Labels[labelVolume] == "" {
 		return nil
 	}
-	script := "mkdir -p " + guestHomePath + "/.local/bin " + guestBinPath + " /etc/profile.d && " +
+	script := "mkdir -p " + guestHomePath + "/.local/bin " + guestBinPath + " && " +
 		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > " + guestHomePath + "/.profile && " +
-		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > " + guestHomePath + "/.bashrc && " +
-		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > /etc/profile.d/cautem-path.sh"
+		"printf '%s\\n' 'export PATH=\"" + guestHomePath + "/.local/bin:" + guestBinPath + ":$PATH\"' > " + guestHomePath + "/.bashrc"
 	execID, err := d.cli.ExecCreate(ctx, id, client.ExecCreateOptions{
-		Cmd:          []string{"/bin/bash", "-c", script},
+		Cmd:          []string{"/bin/sh", "-c", script},
 		AttachStdout: true,
 		AttachStderr: true,
 		WorkingDir:   "/",
@@ -125,7 +126,12 @@ func (d *Driver) ensureGuestLayout(ctx context.Context, id string) error {
 		return fmt.Errorf("guest layout exec attach: %w", err)
 	}
 	defer attach.Close()
-	_, _ = io.Copy(io.Discard, attach.Reader)
+	var stdout, stderr bytes.Buffer
+	_, _ = stdcopy.StdCopy(&stdout, &stderr, io.LimitReader(attach.Reader, 64<<10))
+	output := strings.TrimSpace(stderr.String())
+	if output == "" {
+		output = strings.TrimSpace(stdout.String())
+	}
 	insp, err := d.cli.ExecInspect(ctx, execID.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return err
@@ -138,9 +144,9 @@ func (d *Driver) ensureGuestLayout(ctx context.Context, id string) error {
 			daemonError = strings.TrimSpace(info.Container.State.Error)
 		}
 		if daemonError != "" {
-			return fmt.Errorf("guest layout exit %d (container state=%s: %s)", insp.ExitCode, state, daemonError)
+			return fmt.Errorf("guest layout exit %d (container state=%s: %s, output=%q)", insp.ExitCode, state, daemonError, output)
 		}
-		return fmt.Errorf("guest layout exit %d (container state=%s)", insp.ExitCode, state)
+		return fmt.Errorf("guest layout exit %d (container state=%s, output=%q)", insp.ExitCode, state, output)
 	}
 	return nil
 }

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [v0.2.1] - 2026-10-13
+
+### Fixed
+
+- Initialize the persistent guest PATH with `/bin/sh` from the sandbox user profile, without requiring write access to `/etc`.
+
 ## [v0.2.0] - 2026-10-13
 
 ### Added
