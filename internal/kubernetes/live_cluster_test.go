@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cautem/cautem-driver/driver"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -26,6 +28,186 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 )
+
+// TestLiveDriverLifecycle exercises the public ComputeDriver against an
+// installed Agent Sandbox controller. It is opt-in because it creates real
+// namespaces, PVCs, NetworkPolicies, Pods, and Secrets in the selected cluster.
+func TestLiveDriverLifecycle(t *testing.T) {
+	if os.Getenv("CAUTEM_TEST_KUBERNETES_DRIVER") != "1" {
+		t.Skip("set CAUTEM_TEST_KUBERNETES_DRIVER=1 to run ComputeDriver lifecycle against a disposable cluster")
+	}
+	proxyImage := strings.TrimSpace(os.Getenv("CAUTEM_TEST_KUBERNETES_PROXY_IMAGE"))
+	runtimeImage := strings.TrimSpace(os.Getenv("CAUTEM_TEST_KUBERNETES_RUNTIME_IMAGE"))
+	if proxyImage == "" || runtimeImage == "" {
+		t.Fatal("set CAUTEM_TEST_KUBERNETES_PROXY_IMAGE and CAUTEM_TEST_KUBERNETES_RUNTIME_IMAGE to digest-pinned images")
+	}
+
+	var suffixBytes [5]byte
+	if _, err := rand.Read(suffixBytes[:]); err != nil {
+		t.Fatalf("generate isolated lifecycle identity: %v", err)
+	}
+	suffix := hex.EncodeToString(suffixBytes[:])
+	gatewayID := "gateway-live-" + suffix
+	workspace := "live-workspace-" + suffix
+	name := "live-driver-" + suffix
+	policyPath := filepath.Join(t.TempDir(), "policy.yaml")
+	if err := os.WriteFile(policyPath, []byte("version: 1\n"), 0o600); err != nil {
+		t.Fatalf("write sandbox policy: %v", err)
+	}
+	config := EngineConfig{
+		GatewayID: gatewayID, DefaultImage: runtimeImage, ProxyImage: proxyImage,
+		SandboxRuntimeImage: runtimeImage, GRPCEndpoint: "gateway.invalid:7443",
+		WorkspaceStorageSize: "1Mi",
+	}
+	config.applyDefaults()
+	if err := config.Validate(); err != nil {
+		t.Fatalf("validate live Kubernetes driver configuration: %v", err)
+	}
+	d := NewWithEngineConfig(config)
+	clusterConfig := liveClusterRESTConfig(t)
+	client, err := dynamic.NewForConfig(clusterConfig)
+	if err != nil {
+		t.Fatalf("create live Kubernetes client: %v", err)
+	}
+	d.client = client
+	coreClient, err := kubernetes.NewForConfig(clusterConfig)
+	if err != nil {
+		t.Fatalf("create live Kubernetes diagnostics client: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	handle, err := d.Create(ctx, driver.Spec{
+		Name: name, Image: runtimeImage, PolicyPath: policyPath,
+		GatewayID: gatewayID, GatewayURL: "http://gateway.invalid:7443",
+		Command: []string{"sleep", "infinity"},
+		ProxyEnv: []string{
+			"CAUTEM_GATEWAY_URL=http://gateway.invalid:7443",
+			"CAUTEM_SANDBOX=" + name,
+			"CAUTEM_SANDBOX_TOKEN=live-driver-token",
+		},
+		Labels: map[string]string{driver.WorkspaceLabel: workspace, driver.GatewayIDLabel: gatewayID},
+	})
+	if err != nil {
+		t.Fatalf("ComputeDriver.Create(): %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute)
+		defer cleanupCancel()
+		if err := d.Delete(cleanupCtx, handle.ID); err != nil {
+			t.Errorf("cleanup ComputeDriver.Delete(): %v", err)
+		}
+		namespace, err := coreClient.CoreV1().Namespaces().Get(cleanupCtx, handle.Network, metav1.GetOptions{})
+		if err == nil {
+			uid := namespace.UID
+			if err := coreClient.CoreV1().Namespaces().Delete(cleanupCtx, handle.Network, metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}); err != nil {
+				t.Errorf("cleanup live workspace Namespace %s: %v", handle.Network, err)
+			}
+		} else if !apierrors.IsNotFound(err) {
+			t.Errorf("read live workspace Namespace during cleanup: %v", err)
+		}
+	})
+	if handle.Name != name || handle.Network == "" || handle.Image != runtimeImage {
+		t.Fatalf("ComputeDriver.Create() handle = %#v", handle)
+	}
+
+	listed, err := d.List(ctx)
+	if err != nil {
+		t.Fatalf("ComputeDriver.List(): %v", err)
+	}
+	if len(listed) != 1 || listed[0].Name != name || listed[0].Image != runtimeImage {
+		t.Fatalf("ComputeDriver.List() = %#v; want only the created sandbox", listed)
+	}
+	inspected, err := d.Inspect(ctx, string(handle.ID))
+	if err != nil {
+		t.Fatalf("ComputeDriver.Inspect(): %v", err)
+	}
+	if inspected.Name != name || inspected.Image != runtimeImage || inspected.Network != handle.Network {
+		t.Fatalf("ComputeDriver.Inspect() = %#v; want the created sandbox identity", inspected)
+	}
+	strictGroups, unsupportedNodes, err := liveClusterStrictSupplementalGroupsSupport(ctx, coreClient)
+	if err != nil {
+		t.Fatalf("inspect Kubernetes node security capabilities: %v", err)
+	}
+	if !strictGroups {
+		t.Skipf("sandbox Start requires strict supplemental group isolation; unsupported schedulable nodes: %s", strings.Join(unsupportedNodes, ", "))
+	}
+	if err := d.Start(ctx, handle.ID); err != nil {
+		dumpLiveDriverDiagnostics(t, ctx, coreClient, handle.Network)
+		t.Fatalf("ComputeDriver.Start(): %v", err)
+	}
+	if err := d.Stop(ctx, handle.ID); err != nil {
+		dumpLiveDriverDiagnostics(t, ctx, coreClient, handle.Network)
+		t.Fatalf("ComputeDriver.Stop(): %v", err)
+	}
+	if err := d.Start(ctx, handle.ID); err != nil {
+		dumpLiveDriverDiagnostics(t, ctx, coreClient, handle.Network)
+		t.Fatalf("ComputeDriver.Start() after Stop(): %v", err)
+	}
+	if err := d.Delete(ctx, handle.ID); err != nil {
+		t.Fatalf("ComputeDriver.Delete(): %v", err)
+	}
+}
+
+func liveClusterStrictSupplementalGroupsSupport(ctx context.Context, client kubernetes.Interface) (bool, []string, error) {
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return false, nil, err
+	}
+	var unsupported []string
+	eligible := 0
+	for _, node := range nodes.Items {
+		if node.Spec.Unschedulable {
+			continue
+		}
+		ready := false
+		for _, condition := range node.Status.Conditions {
+			if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
+				ready = true
+				break
+			}
+		}
+		if !ready {
+			continue
+		}
+		eligible++
+		if node.Status.Features == nil || node.Status.Features.SupplementalGroupsPolicy == nil || !*node.Status.Features.SupplementalGroupsPolicy {
+			unsupported = append(unsupported, node.Name)
+		}
+	}
+	if eligible == 0 {
+		return false, nil, fmt.Errorf("cluster has no Ready schedulable nodes")
+	}
+	return len(unsupported) == 0, unsupported, nil
+}
+
+func dumpLiveDriverDiagnostics(t *testing.T, ctx context.Context, client kubernetes.Interface, namespace string) {
+	t.Helper()
+	pods, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Logf("live Kubernetes diagnostic Pod list: %v", err)
+	} else {
+		for _, pod := range pods.Items {
+			t.Logf("live Kubernetes Pod %s phase=%s conditions=%#v init=%#v containers=%#v", pod.Name, pod.Status.Phase, pod.Status.Conditions, pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses)
+			for _, container := range pod.Spec.Containers {
+				logs, logErr := client.CoreV1().Pods(namespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: container.Name}).Do(ctx).Raw()
+				if logErr != nil {
+					t.Logf("live Kubernetes Pod %s container %s logs: %v", pod.Name, container.Name, logErr)
+				} else if len(logs) != 0 {
+					t.Logf("live Kubernetes Pod %s container %s logs: %s", pod.Name, container.Name, strings.TrimSpace(string(logs)))
+				}
+			}
+		}
+	}
+	events, err := client.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Logf("live Kubernetes diagnostic Event list: %v", err)
+		return
+	}
+	for _, event := range events.Items {
+		t.Logf("live Kubernetes Event %s/%s type=%s reason=%s message=%s", event.InvolvedObject.Kind, event.InvolvedObject.Name, event.Type, event.Reason, event.Message)
+	}
+}
 
 // TestLiveAgentSandboxCreateSequence exercises the Cautem Agent Sandbox
 // controller and Kubernetes APIs. It is opt-in so ordinary unit tests never
