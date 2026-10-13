@@ -29,7 +29,7 @@ jobs:
         with:
           repository: cautem/cautem-core
           path: cautem-core
-          ref: 91a83675f9cf80887fdc652b6031ee863bbd7f55
+          ref: 3e8578194f94048a5c2619d2e1411eac546de985
       - name: Configure Go workspace
         working-directory: ${{ github.workspace }}
         shell: bash
@@ -102,7 +102,7 @@ jobs:
           version="$(docker exec --user podman -e HOME=/home/podman -e XDG_RUNTIME_DIR=/run/user/1000 cautem-podman-rootless podman --version)"
           echo "$version" | grep -E '^podman version 6\.' >/dev/null
           docker exec --user podman -e HOME=/home/podman -e XDG_RUNTIME_DIR=/run/user/1000 \
-            cautem-podman-rootless podman pull docker.io/library/alpine:3.22
+            cautem-podman-rootless podman pull public.ecr.aws/docker/library/alpine:3.22
           docker cp "$RUNNER_TEMP/podman-rootless.test" cautem-podman-rootless:/tmp/podman-rootless.test
       - name: Run required rootless service recovery scenario
         shell: bash
@@ -116,7 +116,7 @@ jobs:
             -e DOCKER_HOST=tcp://127.0.0.1:18501 \
             -e CAUTEM_PODMAN_ROOTLESS=1 \
             -e CAUTEM_PODMAN_WORKSPACE=/tmp/cautem-rootless-workspace \
-            -e CAUTEM_E2E_SANDBOX_IMAGE=docker.io/library/alpine:3.22 \
+            -e CAUTEM_E2E_SANDBOX_IMAGE=public.ecr.aws/docker/library/alpine:3.22 \
             cautem-podman-rootless /tmp/podman-rootless.test \
             -test.run '^TestPodmanRootlessServiceRecovery$' -test.count=1 -test.v 2>&1 | tee "$log"
           grep -F -- '--- PASS: TestPodmanRootlessServiceRecovery' "$log" >/dev/null
@@ -135,7 +135,7 @@ jobs:
             -e CAUTEM_PODMAN_ROOTLESS=1 \
             -e CAUTEM_PODMAN_USERNS_E2E=1 \
             -e CAUTEM_PODMAN_WORKSPACE=/tmp/cautem-rootless-workspace \
-            -e CAUTEM_E2E_SANDBOX_IMAGE=docker.io/library/alpine:3.22 \
+            -e CAUTEM_E2E_SANDBOX_IMAGE=public.ecr.aws/docker/library/alpine:3.22 \
             cautem-podman-rootless /tmp/podman-rootless.test \
             -test.run '^TestPodmanUsernsMatrixE2E$' -test.count=1 -test.v 2>&1 | tee "$log"
           grep -F -- '--- PASS: TestPodmanUsernsMatrixE2E' "$log" >/dev/null

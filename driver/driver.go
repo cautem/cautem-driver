@@ -13,11 +13,21 @@ import (
 // sandbox PID 1 can request lifecycle RPCs through the authenticated sidecar.
 const SupervisorControlSocketName = "supervisor-control.sock"
 
+// WorkspaceLabel carries the Gateway-verified workspace identifier to compute
+// drivers. It is reserved for internal routing and tenancy boundaries; callers
+// must overwrite any user-provided value before opening a driver.
+const WorkspaceLabel = "cautem.internal/workspace"
+
+// GatewayIDLabel carries the trusted Gateway installation identity through
+// compute protocols that only preserve sandbox labels.
+const GatewayIDLabel = "cautem.internal/gateway-id"
+
 // Spec describes a sandbox to create.
 type Spec struct {
 	Name      string   // human name → container cautem-<name>
 	Image     string   // default cautem-sandbox:local (published cautem base)
 	Workspace string   // absolute host path → /workspace
+	GatewayID string   // trusted Gateway installation identity for tenancy boundaries
 	Command   []string // default: sleep infinity
 	Env       []string // KEY=VAL (already allowlisted by caller)
 	IKnow     bool     // override mount deny-list (logged by caller)
@@ -131,6 +141,13 @@ type ComputeDriver interface {
 	// EnsureSSHDaemon (re)starts the in-sandbox relay sshd; ErrSSHDisabled when
 	// the sandbox was created without SSH.
 	EnsureSSHDaemon(ctx context.Context, id core.ID) error
+}
+
+// ProxyReadiness is an optional capability for backends whose proxy is a
+// separate runtime resource. Gateway uses it after lifecycle Start to wait for
+// that resource without assuming it is a local container named cautem-proxy-*.
+type ProxyReadiness interface {
+	WaitProxyReady(ctx context.Context, sandboxName string) error
 }
 
 // ErrSSHDisabled reports a sandbox created without the SSH relay.

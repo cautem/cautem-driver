@@ -41,6 +41,8 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 			cfg.GatewayGRPCEndpoint, err = configString(value)
 		case "ssh_socket_path":
 			cfg.SandboxSSHSocketPath, err = configString(value)
+		case "cautem_internal_cleanup_manifest_dir":
+			cfg.CleanupManifestDir, err = configString(value)
 		case "sandbox_pids_limit":
 			cfg.PidsLimit, err = configInt64(value)
 		case "stop_timeout_secs":
@@ -81,6 +83,9 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 	}
 	if strings.TrimSpace(cfg.SandboxNamespace) == "" {
 		return RuntimeConfig{}, "", fmt.Errorf("docker: sandbox_namespace must not be empty")
+	}
+	if cfg.CleanupManifestDir != "" && (!filepath.IsAbs(cfg.CleanupManifestDir) || filepath.Clean(cfg.CleanupManifestDir) != cfg.CleanupManifestDir) {
+		return RuntimeConfig{}, "", fmt.Errorf("docker: cleanup manifest directory must be an absolute clean path")
 	}
 	if err := validateGuestTLSPaths(cfg.GuestTLSCA, cfg.GuestTLSCert, cfg.GuestTLSKey); err != nil {
 		return RuntimeConfig{}, "", fmt.Errorf("docker: %w", err)

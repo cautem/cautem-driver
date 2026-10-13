@@ -36,6 +36,17 @@ func TestResolveHostPrefersDOCKER_HOST(t *testing.T) {
 	}
 }
 
+func TestConfigFromMapAcceptsAbsoluteCleanupManifestDirectory(t *testing.T) {
+	manifestDir := filepath.Join(t.TempDir(), "cleanup")
+	cfg, err := ConfigFromMap(map[string]any{"cautem_internal_cleanup_manifest_dir": manifestDir})
+	if err != nil || cfg.CleanupManifestDir != manifestDir {
+		t.Fatalf("cleanup manifest config=%q err=%v", cfg.CleanupManifestDir, err)
+	}
+	if _, err := ConfigFromMap(map[string]any{"cautem_internal_cleanup_manifest_dir": "relative/cleanup"}); err == nil {
+		t.Fatal("accepted relative cleanup manifest directory")
+	}
+}
+
 func TestNewWithConfigRejectsUnsupportedRuntimeSettings(t *testing.T) {
 	if _, err := NewWithConfig(Config{HostGatewayIP: "not-an-ip"}); err == nil {
 		t.Fatal("invalid host_gateway_ip was accepted")

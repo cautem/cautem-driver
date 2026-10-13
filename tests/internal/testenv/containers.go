@@ -16,6 +16,11 @@ import (
 
 const containerTimeout = 2 * time.Minute
 
+// AlpineImage uses the Docker Official Images mirror on Public ECR. Its tag
+// manifest is byte-for-byte identical to docker.io/library/alpine:3.22, while
+// avoiding Docker Hub pull throttling in nested test daemons.
+const AlpineImage = "public.ecr.aws/docker/library/alpine:3.22"
+
 // RequireContainers makes container-backed suites opt-in and gives every
 // container a bounded lifetime. The normal module test command remains usable
 // without Docker or Podman.
@@ -31,7 +36,7 @@ func RequireContainers(t *testing.T) context.Context {
 
 func RunAlpine(ctx context.Context, t *testing.T) testcontainers.Container {
 	t.Helper()
-	container, err := testcontainers.Run(ctx, "docker.io/library/alpine:3.22",
+	container, err := testcontainers.Run(ctx, AlpineImage,
 		testcontainers.WithCmd("sh", "-c", "echo cautem-testcontainers-ready"),
 		testcontainers.WithWaitStrategy(wait.ForLog("cautem-testcontainers-ready")),
 	)

@@ -31,7 +31,7 @@ func TestDockerDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 	name := "testcontainers-lifecycle"
 	handle, err := engine.Create(ctx, driver.Spec{
 		Name:             name,
-		Image:            "docker.io/library/alpine:3.22",
+		Image:            testenv.AlpineImage,
 		Workspace:        "/tmp",
 		Command:          []string{"sh", "-c", "echo ready; sleep 60"},
 		NoHarden:         true,
@@ -106,7 +106,7 @@ func TestDockerDriverRecoversAfterDaemonRestart(t *testing.T) {
 
 	handle, err := engine.Create(ctx, driver.Spec{
 		Name:      "testcontainers-daemon-recovery",
-		Image:     "docker.io/library/alpine:3.22",
+		Image:     testenv.AlpineImage,
 		Workspace: "/tmp",
 		Command:   []string{"sh", "-c", "sleep 120"},
 		NoHarden:  true,

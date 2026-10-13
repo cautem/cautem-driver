@@ -32,7 +32,7 @@ func TestPodmanDriverLifecycleAgainstTestcontainersEngine(t *testing.T) {
 
 	handle, err := engine.Create(ctx, driver.Spec{
 		Name:             "testcontainers-podman-lifecycle",
-		Image:            "docker.io/library/alpine:3.22",
+		Image:            testenv.AlpineImage,
 		Workspace:        workspace,
 		Command:          []string{"sh", "-c", "echo ready; sleep 60"},
 		NoHarden:         true,
@@ -97,7 +97,7 @@ func TestPodmanDriverRecoversAfterServiceRestart(t *testing.T) {
 
 	handle, err := engine.Create(ctx, driver.Spec{
 		Name:      "testcontainers-podman-recovery",
-		Image:     "docker.io/library/alpine:3.22",
+		Image:     testenv.AlpineImage,
 		Workspace: workspace,
 		Command:   []string{"sh", "-c", "sleep 120"},
 		NoHarden:  true,

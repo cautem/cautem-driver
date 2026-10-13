@@ -20,7 +20,17 @@ func stub(op string) error {
 	return fmt.Errorf("vm driver: %s not implemented — see docs/exp/MICROVM.md", op)
 }
 
-func (d *Driver) Create(context.Context, driver.Spec) (driver.Handle, error) {
+func (d *Driver) Create(_ context.Context, spec driver.Spec) (driver.Handle, error) {
+	if err := validateSandboxName(spec.Name); err != nil {
+		return driver.Handle{}, err
+	}
+	config, err := ParseSandboxDriverConfig(spec.DriverConfigJSON)
+	if err != nil {
+		return driver.Handle{}, err
+	}
+	if err := validateGPURequest(spec.GPU, config); err != nil {
+		return driver.Handle{}, err
+	}
 	return driver.Handle{}, stub("Create")
 }
 func (d *Driver) Start(context.Context, core.ID) error  { return stub("Start") }

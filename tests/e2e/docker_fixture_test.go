@@ -23,7 +23,7 @@ func TestDockerDriverFixtureExposesIsolatedEngine(t *testing.T) {
 	if _, err := engine.Info(ctx, client.InfoOptions{}); err != nil {
 		t.Fatalf("Docker-in-Docker Engine info: %v", err)
 	}
-	pull, err := engine.ImagePull(ctx, "docker.io/library/alpine:3.22", client.ImagePullOptions{})
+	pull, err := engine.ImagePull(ctx, testenv.AlpineImage, client.ImagePullOptions{})
 	if err != nil {
 		t.Fatalf("pull fixture image: %v", err)
 	}
@@ -32,7 +32,7 @@ func TestDockerDriverFixtureExposesIsolatedEngine(t *testing.T) {
 		t.Fatalf("read fixture image pull: %v", err)
 	}
 
-	created, err := engine.ContainerCreate(ctx, client.ContainerCreateOptions{Config: &container.Config{Image: "docker.io/library/alpine:3.22", Cmd: []string{"/bin/true"}}})
+	created, err := engine.ContainerCreate(ctx, client.ContainerCreateOptions{Config: &container.Config{Image: testenv.AlpineImage, Cmd: []string{"/bin/true"}}})
 	if err != nil {
 		t.Fatalf("create fixture container: %v", err)
 	}

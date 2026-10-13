@@ -2,12 +2,13 @@ package docker
 
 import (
 	"fmt"
-	"github.com/cautem/cautem-core/defaults"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/cautem/cautem-core/defaults"
 )
 
 func providerWorkloadSocket(env []string) (string, error) {

@@ -72,6 +72,8 @@ func ConfigFromMap(values map[string]any) (Config, error) {
 			cfg.GatewayGRPCEndpoint, err = stringValue(value)
 		case "sandbox_ssh_socket_path":
 			cfg.SandboxSSHSocketPath, err = stringValue(value)
+		case "cautem_internal_cleanup_manifest_dir":
+			cfg.CleanupManifestDir, err = stringValue(value)
 		case "stop_timeout_secs":
 			cfg.StopTimeoutSecs, err = intValue(value)
 		case "gateway_port":
@@ -99,6 +101,9 @@ func ConfigFromMap(values map[string]any) (Config, error) {
 		if _, err := netip.ParseAddr(cfg.HostGatewayIP); err != nil {
 			return Config{}, fmt.Errorf("podman: invalid host_gateway_ip: %w", err)
 		}
+	}
+	if cfg.CleanupManifestDir != "" && (!filepath.IsAbs(cfg.CleanupManifestDir) || filepath.Clean(cfg.CleanupManifestDir) != cfg.CleanupManifestDir) {
+		return Config{}, fmt.Errorf("podman: cleanup manifest directory must be an absolute clean path")
 	}
 	if err := validateGuestTLSPaths(cfg.GuestTLSCA, cfg.GuestTLSCert, cfg.GuestTLSKey); err != nil {
 		return Config{}, fmt.Errorf("podman: %w", err)

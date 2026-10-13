@@ -45,6 +45,7 @@ type Config struct {
 	GatewayGRPCEndpoint             string
 	GatewayGRPCPort                 int
 	SandboxSSHSocketPath            string
+	CleanupManifestDir              string
 	HealthCheckIntervalSecs         int64
 	UsernsMode                      string
 	UIDMap                          []IDMapping
@@ -144,6 +145,7 @@ func NewWithConfig(cfg Config) (*docker.Driver, error) {
 		ProviderSPIFFEWorkloadAPISocket: cfg.ProviderSPIFFEWorkloadAPISocket,
 		GatewayGRPCEndpoint:             cfg.GatewayGRPCEndpoint, GatewayGRPCPort: cfg.GatewayGRPCPort,
 		SandboxSSHSocketPath:           cfg.SandboxSSHSocketPath,
+		CleanupManifestDir:             cfg.CleanupManifestDir,
 		HealthCheckIntervalSecs:        cfg.HealthCheckIntervalSecs,
 		UsernsMode:                     cfg.UsernsMode,
 		DefaultCPU:                     defaultPodmanCPU,

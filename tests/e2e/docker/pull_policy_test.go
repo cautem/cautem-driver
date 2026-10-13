@@ -40,13 +40,13 @@ func TestDockerPullPolicySupportsDigestPinnedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer cli.Close()
-	pull, err := cli.ImagePull(ctx, "docker.io/library/alpine:3.22", client.ImagePullOptions{})
+	pull, err := cli.ImagePull(ctx, testenv.AlpineImage, client.ImagePullOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, _ = io.Copy(io.Discard, pull)
 	_ = pull.Close()
-	image, err := cli.ImageInspect(ctx, "docker.io/library/alpine:3.22")
+	image, err := cli.ImageInspect(ctx, testenv.AlpineImage)
 	if err != nil || len(image.RepoDigests) == 0 {
 		t.Fatalf("inspect pulled image digests=%v err=%v", image.RepoDigests, err)
 	}
