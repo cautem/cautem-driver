@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [v0.2.0] - 2026-10-13
+
+### Added
+
+- Add an experimental Agent Sandbox Kubernetes backend with sandbox lifecycle, listing, inspection, PVC workspaces, and paired Cautem workload/proxy runtimes.
+- Rotate immutable Kubernetes runtime credential generations and deliver policy updates by restarting the affected runtime.
+- Renew Kubernetes bridge certificates within 30 days of expiry during the Gateway's daily maintenance pass.
+
+### Changed
+
+- Split the Docker driver implementation into focused lifecycle, networking, copy, and runtime files.
+- Keep Kubernetes exec, logs, and file transfer on the authenticated Cautem relay; direct Kubernetes data-plane methods remain unsupported.
+- Refresh Docker, Moby, Kubernetes client, and terminal dependencies to their latest compatible releases.
+
 ## [v0.1.7] - 2026-10-11
 
 ### Fixed

@@ -19,6 +19,17 @@ func TestConfigFromMapAppliesSupportedGatewayEngineFields(t *testing.T) {
 	}
 }
 
+func TestConfigFromMapAcceptsOnlyAbsoluteCleanupManifestDirectory(t *testing.T) {
+	manifestDir := filepath.Join(t.TempDir(), "cleanup")
+	cfg, _, err := ConfigFromMap(map[string]any{"cautem_internal_cleanup_manifest_dir": manifestDir})
+	if err != nil || cfg.CleanupManifestDir != manifestDir {
+		t.Fatalf("cleanup manifest config=%q err=%v", cfg.CleanupManifestDir, err)
+	}
+	if _, _, err := ConfigFromMap(map[string]any{"cautem_internal_cleanup_manifest_dir": "relative/cleanup"}); err == nil {
+		t.Fatal("accepted relative cleanup manifest directory")
+	}
+}
+
 func TestNormalizeImagePullPolicyCanonicalizesAliases(t *testing.T) {
 	for _, input := range []string{"missing", "Missing", "ifnotpresent", "if-not-present", "if_not_present"} {
 		if got, err := NormalizeImagePullPolicy(input); err != nil || got != "missing" {

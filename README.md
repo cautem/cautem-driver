@@ -20,23 +20,25 @@
 
 Backend setup and runtime limits are maintained in the [Docker](https://cautem.github.io/sandbox.dev/providers/docker/) and [Podman](https://cautem.github.io/sandbox.dev/providers/podman/) guides. The [OpenShell compatibility page](https://cautem.github.io/sandbox.dev/reference/openshell-compatibility/) records the current comparison scope.
 
-**cautem-driver** implements `ComputeDriver` for cautem: create/start/exec/delete containers, attach the egress sidecar, validate bind mounts, and inject OpenShell-style host-gateway aliases (`host.cautem.internal`).
+**cautem-driver** implements `ComputeDriver` for cautem. Docker and Podman provide the local container lifecycle; Kubernetes provisions Agent Sandbox workloads and a paired Cautem proxy companion. The Kubernetes backend remains experimental until the target cluster passes the live runtime and NetworkPolicy checks in the [Gateway packaging guide](https://github.com/cautem/cautem-gateway/blob/main/packaging/README.md).
 
 ### Key Features
 
 | Category | Capabilities |
 |----------|--------------|
 | **Docker** | Engine API create/exec/logs (Podman-compatible socket) |
+| **Kubernetes** | Agent Sandbox lifecycle, workspace namespace/PVC, gated workload and proxy Pods, immutable credential generations |
 | **Sidecar** | Proxy container on dual-home network + CA bundle env |
 | **Hosts** | `HostGatewayExtraHosts()` → `host.cautem.internal` / `host.docker.internal` |
 | **Mounts** | Workdir + reserved system paths validation |
-| **Stubs** | VM / K8s placeholders for future drivers |
+| **Experimental** | Kubernetes requires Agent Sandbox, digest-pinned Cautem images, persistent storage, and a CNI that enforces NetworkPolicy |
+| **Stubs** | VM placeholder |
 
 ---
 
 ## Installation
 
-Develop this module in the sibling `go.work` workspace; run `go test ./...` from this checkout. The published alpha module path does not yet support a clean standalone `go get`.
+Run `go test ./...` from this checkout. The module is also available as a standalone Go dependency.
 
 **Requirements:** Go 1.27+, Docker-compatible Engine API 1.40 or newer.
 
@@ -73,9 +75,28 @@ _ = hosts
 | `driver/all/` | Blank-import to register backends |
 | `internal/docker/` | Docker Engine implementation |
 | `internal/podman/` | Podman socket discovery → Docker API client |
-| `internal/vm/`, `internal/kubernetes/` | Stub drivers |
+| `internal/vm/` | Stub driver |
+| `internal/kubernetes/` | Agent Sandbox lifecycle, workspace isolation, immutable runtime Secrets, and paired Cautem Pods |
 | `internal/mounts/` | Bind-mount policy |
 | `internal/sidecar/` | CA / env helpers for the proxy sidecar |
+
+## Kubernetes status
+
+The Kubernetes driver creates and recovers Agent Sandbox resources, uses a PVC
+for the default workspace, and rotates bearer and mTLS credentials on restart.
+Policy changes replace immutable Secret generations; an active sandbox is
+restarted so the workload and proxy load the same policy. The Gateway waits for
+the supervisor to report the new revision.
+
+Configure `CAUTEM_KUBERNETES_PROXY_IMAGE` and
+`CAUTEM_KUBERNETES_RUNTIME_IMAGE` with immutable `@sha256:` references, and set
+`CAUTEM_KUBERNETES_GRPC_ENDPOINT` to an endpoint reachable from Pods. HTTPS
+endpoints also require the `CAUTEM_KUBERNETES_GUEST_TLS_CA`,
+`CAUTEM_KUBERNETES_GUEST_TLS_CERT`, and `CAUTEM_KUBERNETES_GUEST_TLS_KEY`
+files. The cluster needs the Agent Sandbox controller, a working PVC storage
+class, and a NetworkPolicy-enforcing CNI. Run the live traffic probe against
+the target cluster before enabling this experimental backend; fake API tests
+and object admission do not verify workload startup or traffic isolation.
 
 
 ---

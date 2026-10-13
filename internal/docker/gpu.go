@@ -46,9 +46,10 @@ func ValidateGPURequest(spec driver.Spec) error {
 }
 
 const (
-	defaultCDIDevice = "nvidia.com/gpu=all"
-	labelGPU         = "cautem.gpu"
-	gpuSandboxImage  = defaults.ImageGPU
+	defaultCDIDevice   = "nvidia.com/gpu=all"
+	labelGPU           = "cautem.gpu"
+	gpuSandboxImage    = defaults.ImageGPU
+	guiGPUSandboxImage = defaults.ImageGUIGPU
 )
 
 // DeviceRequestsForGPU builds Docker CDI DeviceRequests for a Spec (nil if GPU off).

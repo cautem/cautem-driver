@@ -17,6 +17,7 @@ import (
 	"github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-driver/driver"
 	podman "github.com/cautem/cautem-driver/internal/podman"
+	"github.com/cautem/cautem-driver/tests/internal/testenv"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
@@ -36,7 +37,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 	defer cancel()
 	image := strings.TrimSpace(os.Getenv("CAUTEM_E2E_SANDBOX_IMAGE"))
 	if image == "" {
-		image = "docker.io/library/alpine:3.22"
+		image = testenv.AlpineImage
 	}
 	helperDir := strings.TrimSpace(os.Getenv("CAUTEM_HELPERS_DIR"))
 	proxyBin := filepath.Join(helperDir, "cautem")

@@ -1,51 +1,85 @@
-// Package kubernetes is an EXP Kubernetes compute-driver spike (not implemented).
+// Package kubernetes implements the Kubernetes compute backend.
 package kubernetes
 
 import (
 	"context"
-	"fmt"
-	"io"
+	"os"
+	"strings"
+	"sync"
 
 	"github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-driver/driver"
+	"k8s.io/client-go/dynamic"
 )
 
-// Driver is a placeholder for a future client-go / Agent Sandbox backend.
-type Driver struct{}
+// Driver accesses Agent Sandbox resources owned by one Gateway installation.
+// Kubernetes credentials are loaded lazily so importing the driver does not
+// make CLI startup depend on a cluster being reachable.
+type Driver struct {
+	gatewayID string
 
-// New returns the stub Kubernetes driver.
-func New() *Driver { return &Driver{} }
-
-func stub(op string) error {
-	return fmt.Errorf("kubernetes driver: %s not implemented — see docs/exp/KUBERNETES.md", op)
+	mu            sync.Mutex
+	client        dynamic.Interface
+	loadClient    func() (dynamic.Interface, error)
+	apiVersions   sandboxAPIVersionResolver
+	runtimeConfig EngineConfig
+	createBackend agentSandboxCreateSequenceBackend
 }
 
-func (d *Driver) Create(context.Context, driver.Spec) (driver.Handle, error) {
-	return driver.Handle{}, stub("Create")
+// New returns a Kubernetes driver. Standalone users can set CAUTEM_GATEWAY_ID;
+// the Gateway passes its durable identity through NewWithGatewayID.
+func New() *Driver { return NewWithGatewayID(os.Getenv("CAUTEM_GATEWAY_ID")) }
+
+// NewWithGatewayID scopes discovery to the durable identity of one Gateway.
+func NewWithGatewayID(gatewayID string) *Driver {
+	config := EngineConfigFromEnvironment()
+	if strings.TrimSpace(gatewayID) != "" {
+		config.GatewayID = strings.TrimSpace(gatewayID)
+	}
+	return NewWithEngineConfig(config)
 }
-func (d *Driver) Start(context.Context, core.ID) error  { return stub("Start") }
-func (d *Driver) Stop(context.Context, core.ID) error   { return stub("Stop") }
-func (d *Driver) Delete(context.Context, core.ID) error { return stub("Delete") }
-func (d *Driver) List(context.Context) ([]driver.Info, error) {
-	return nil, stub("List")
+
+func NewWithEngineConfig(config EngineConfig) *Driver {
+	return &Driver{gatewayID: config.GatewayID, loadClient: loadDynamicKubernetesClient, runtimeConfig: config}
 }
-func (d *Driver) Inspect(context.Context, string) (driver.Info, error) {
-	return driver.Info{}, stub("Inspect")
+
+func NewWithConfig(values map[string]any) (*Driver, error) {
+	config, err := EngineConfigFromMap(values)
+	if err != nil {
+		return nil, err
+	}
+	return NewWithEngineConfig(config), nil
 }
-func (d *Driver) Exec(context.Context, core.ID, driver.ExecRequest) (driver.ExecResult, error) {
-	return driver.ExecResult{}, stub("Exec")
+
+func newWithClient(client dynamic.Interface, gatewayID string) *Driver {
+	config := EngineConfigFromEnvironment()
+	config.GatewayID = gatewayID
+	return &Driver{gatewayID: gatewayID, client: client, runtimeConfig: config}
 }
-func (d *Driver) Logs(context.Context, core.ID, bool, io.Writer) error {
-	return stub("Logs")
+
+func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, error) {
+	return d.create(ctx, spec)
 }
-func (d *Driver) CopyTo(context.Context, core.ID, string, string) error {
-	return stub("CopyTo")
+func (d *Driver) Start(ctx context.Context, id core.ID) error { return d.start(ctx, id) }
+func (d *Driver) StartWithToken(ctx context.Context, id core.ID, token string) error {
+	return d.startWithToken(ctx, id, token)
 }
-func (d *Driver) CopyFrom(context.Context, core.ID, string, string) error {
-	return stub("CopyFrom")
+
+// UpdateSandboxPolicy replaces the immutable policy Secrets as one runtime generation.
+func (d *Driver) UpdateSandboxPolicy(ctx context.Context, id core.ID, policy []byte) error {
+	return d.updateSandboxPolicy(ctx, id, policy)
 }
-func (d *Driver) EnsureSSHDaemon(context.Context, core.ID) error {
-	return stub("EnsureSSHDaemon")
+func (d *Driver) RefreshSandboxRuntimeCredentials(ctx context.Context, id core.ID) error {
+	return d.refreshSandboxRuntimeCredentials(ctx, id)
+}
+func (d *Driver) Stop(ctx context.Context, id core.ID) error      { return d.stop(ctx, id) }
+func (d *Driver) Delete(ctx context.Context, id core.ID) error    { return d.delete(ctx, id) }
+func (d *Driver) List(ctx context.Context) ([]driver.Info, error) { return d.list(ctx) }
+func (d *Driver) Inspect(ctx context.Context, nameOrID string) (driver.Info, error) {
+	return d.inspect(ctx, nameOrID)
 }
 
 var _ driver.ComputeDriver = (*Driver)(nil)
+var _ driver.TokenAwareStarter = (*Driver)(nil)
+var _ driver.SandboxPolicyUpdater = (*Driver)(nil)
+var _ driver.SandboxRuntimeCredentialRefresher = (*Driver)(nil)

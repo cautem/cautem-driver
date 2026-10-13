@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cautem-core"
+	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-driver/driver"
 	"github.com/moby/moby/client"
 )
@@ -48,6 +48,36 @@ func TestDefaultSandboxImageUsesCautemBaseWhenNotCached(t *testing.T) {
 
 	if got := d.defaultSandboxImage(context.Background(), "", false); got != localSandboxImage {
 		t.Fatalf("default sandbox image = %q, want %q", got, localSandboxImage)
+	}
+}
+
+func TestDefaultSandboxImageSelectsGUIWithGPU(t *testing.T) {
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	if got := d.defaultSandboxImage(context.Background(), "novnc", true); got != guiGPUSandboxImage {
+		t.Fatalf("GPU display image = %q, want %q", got, guiGPUSandboxImage)
+	}
+	if !imageHasGUI(guiGPUSandboxImage) {
+		t.Fatalf("GPU display image %q was not recognized as GUI", guiGPUSandboxImage)
+	}
+}
+
+func TestImageHasGUIRecognizesPublishedGUIImages(t *testing.T) {
+	for _, image := range []string{
+		"cautem-sandbox:gui",
+		"cautem-sandbox:gui-gpu",
+		"ghcr.io/cautem/cautem/sandboxes/gui:latest",
+		"ghcr.io/cautem/cautem/sandboxes/gui-gpu:latest",
+	} {
+		if !imageHasGUI(image) {
+			t.Errorf("imageHasGUI(%q) = false", image)
+		}
+	}
+	if imageHasGUI("ghcr.io/cautem/cautem/sandboxes/gpu:latest") {
+		t.Fatal("compute-only GPU image was recognized as GUI")
 	}
 }
 
@@ -132,7 +162,7 @@ func TestEnsureNetworkRejectsExistingNonInternalProxyNetwork(t *testing.T) {
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/networks/proxy-sandbox-risk") && r.Method == http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{"Id":"existing-network","Internal":false}`)
+			_, _ = io.WriteString(w, `{"Id":"existing-network","Internal":false,"Labels":{"cautem.sandbox":"1","cautem.name":"risk"}}`)
 		case strings.HasSuffix(r.URL.Path, "/networks/create"):
 			createRequests++
 			w.WriteHeader(http.StatusCreated)
@@ -163,7 +193,7 @@ func TestEnsureNetworkReusesInternalProxyNetwork(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"Id":"internal-network","Internal":true,"Options":{"com.docker.network.bridge.gateway_mode_ipv4":"isolated","com.docker.network.bridge.gateway_mode_ipv6":"isolated"}}`)
+		_, _ = io.WriteString(w, `{"Id":"internal-network","Internal":true,"Labels":{"cautem.sandbox":"1","cautem.name":"safe"},"Options":{"com.docker.network.bridge.gateway_mode_ipv4":"isolated","com.docker.network.bridge.gateway_mode_ipv6":"isolated"}}`)
 	})
 	created, err := d.ensureNetwork(context.Background(), "proxy-sandbox-safe", "safe", true)
 	if err != nil {
@@ -296,7 +326,7 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 		case strings.Contains(r.URL.Path, "/images/"):
 			_, _ = io.WriteString(w, `{"Id":"sha256:immutable-image-id","Config":{"User":"app:staff"}}`)
 		case strings.Contains(r.URL.Path, "/networks/"):
-			_, _ = io.WriteString(w, `{"Id":"network-id"}`)
+			_, _ = io.WriteString(w, `{"Id":"network-id","Labels":{"cautem.sandbox":"1","cautem.name":"sdk-fixture"}}`)
 		case r.URL.Path == "/v1.41/containers/create":
 			if err := json.NewDecoder(r.Body).Decode(&created); err != nil {
 				t.Error(err)
@@ -422,7 +452,7 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 		case strings.Contains(r.URL.Path, "/images/"):
 			_, _ = io.WriteString(w, `{"Id":"sha256:immutable-image-id","Config":{"User":"sandbox"}}`)
 		case strings.Contains(r.URL.Path, "/networks/"):
-			_, _ = io.WriteString(w, `{"Id":"network-id"}`)
+			_, _ = io.WriteString(w, `{"Id":"network-id","Labels":{"cautem.sandbox":"1","cautem.name":"go-supervisor"}}`)
 		case r.URL.Path == "/v1.41/containers/create":
 			if err := json.NewDecoder(r.Body).Decode(&created); err != nil {
 				t.Error(err)
