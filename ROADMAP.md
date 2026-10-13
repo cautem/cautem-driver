@@ -1,6 +1,6 @@
 # Roadmap — cautem-driver
 
-Status: **v0.2.0** (release prepared) · Depends on [cautem-core](https://github.com/cautem/cautem-core) `v0.2.0`
+Status: **v0.2.1** (release prepared) · Depends on [cautem-core](https://github.com/cautem/cautem-core) `v0.2.0`
 
 ## This module
 
