@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 the cautem authors
+# SPDX-License-Identifier: Apache-2.0
+name: Hosted Linux KVM probe
+
+on:
+  push:
+    branches: [test/kvm-hosted-gate-20261016]
+
+permissions:
+  contents: read
+
+jobs:
+  kvm-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check host KVM access
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -sm
+          ls -l /dev/kvm
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+          stat -c 'KVM major:minor %t:%T' /dev/kvm
