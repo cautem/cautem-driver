@@ -13,6 +13,12 @@ import (
 	"github.com/moby/moby/client"
 )
 
+// Keep the digest-pinning fixture on the same pinned Fedora registry used to
+// build the Podman 6 CI image. Public ECR started rate-limiting pulls from the
+// rootful CI runner, which made this behavioral test fail before the driver
+// exercised pull-policy behavior.
+const digestFixtureImage = "registry.fedoraproject.org/fedora@sha256:9d18781b6490ad36d596fa53cfa3dec2ba805018eccd218aeafc4a89c402e749"
+
 func TestPodmanPullPolicyNeverFailsClosedBeforeNetworkCreate(t *testing.T) {
 	ctx := testenv.RequireContainers(t)
 	_, endpoint, workspace := testenv.RunPodmanDaemon(ctx, t)
@@ -47,7 +53,7 @@ func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
 	defer cli.Close()
 	pullCtx, cancelPull := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancelPull()
-	pull, err := cli.ImagePull(pullCtx, testenv.AlpineImage, client.ImagePullOptions{})
+	pull, err := cli.ImagePull(pullCtx, digestFixtureImage, client.ImagePullOptions{})
 	if err != nil {
 		logs, _ := daemon.Logs(context.Background())
 		var logText []byte
@@ -59,7 +65,7 @@ func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
 	}
 	_, _ = io.Copy(io.Discard, pull)
 	_ = pull.Close()
-	image, err := cli.ImageInspect(pullCtx, testenv.AlpineImage)
+	image, err := cli.ImageInspect(pullCtx, digestFixtureImage)
 	if err != nil || len(image.RepoDigests) == 0 {
 		t.Fatalf("inspect pulled image digests=%v err=%v", image.RepoDigests, err)
 	}
