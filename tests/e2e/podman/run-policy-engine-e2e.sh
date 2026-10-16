@@ -40,10 +40,10 @@ cleanup() {
 			docker logs "$container_name" >&2 || true
 			docker exec "$container_name" sh -lc 'cat /tmp/podman-policy-service.log 2>/dev/null || true' >&2 || true
 		fi
-		# Podman runs as root or in a user namespace and creates root-owned
-		# files in the host bind. Make the private temp workspace removable by
-		# the runner after the service container exits.
-		docker exec "$container_name" chmod -R u+rwX /cautem-podman-e2e/workspace >/dev/null 2>&1 || true
+		# Podman runs as root or in a user namespace and creates files with
+		# container-side owners in the host bind. Make the private temp workspace
+		# removable by the runner after the service container exits.
+		docker exec "$container_name" chmod -R a+rwX /cautem-podman-e2e/workspace >/dev/null 2>&1 || true
 		docker rm -f "$container_name" >/dev/null 2>&1 || true
 	fi
 	docker image rm -f "$sandbox_image" "$proxy_image" >/dev/null 2>&1 || true
@@ -106,6 +106,10 @@ if [[ "$mode" == "rootless" ]]; then
 		"$container_name" sh -lc \
 		'while true; do podman system service --time=0 tcp:0.0.0.0:18501 >>/tmp/podman-policy-service.log 2>&1 & pid=$!; wait "$pid"; sleep 2; done'
 else
+	# Podman defaults to a 2048 PID limit on cgroup-capable hosts. The nested
+	# hosted-runner cgroup does not delegate the pids controller, so disable only
+	# that default for this disposable rootful test service.
+	docker exec "$container_name" sh -lc 'printf "[containers]\npids_limit = 0\n" > /etc/containers/containers.conf'
 	docker exec -d -e STORAGE_DRIVER=vfs "$container_name" sh -lc \
 		'while true; do podman system service --time=0 tcp:0.0.0.0:18500 >>/tmp/podman-policy-service.log 2>&1 & pid=$!; wait "$pid"; sleep 2; done'
 fi
