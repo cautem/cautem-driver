@@ -70,7 +70,7 @@ if [ -z "$rootfs_tar" ]; then
   docker exec "$container_id" adduser -D -u 1000 sandbox
   rootfs_tar="$build_dir/alpine-rootfs.tar"
   docker export --output "$rootfs_tar" "$container_id"
-  docker rm "$container_id" >/dev/null
+  docker rm -f "$container_id" >/dev/null
   container_id=
 fi
 if [ ! -s "$rootfs_tar" ]; then

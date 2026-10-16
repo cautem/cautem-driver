@@ -15,8 +15,11 @@ jobs:
     timeout-minutes: 20
     env:
       CAUTEM_VM_RUNTIME_DIR: ${{ vars.CAUTEM_VM_RUNTIME_DIR }}
-      CAUTEM_VM_BUILD_DIR: ${{ runner.temp }}/cautem-vm-runtime
     steps:
+      - name: Configure VM build directory
+        shell: bash
+        run: echo "CAUTEM_VM_BUILD_DIR=$RUNNER_TEMP/cautem-vm-runtime" >> "$GITHUB_ENV"
+
       - name: Checkout cautem-driver
         uses: actions/checkout@v4
         with:
