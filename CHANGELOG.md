@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [v0.3.1] - 2026-10-16
+
+### Changed
+
+- Publish the module under `github.com/cautem/quarshell-driver`; earlier tags keep their original module path.
+- Pin `quarshell-core` to v0.3.1, `quarshell-proxy` to v0.3.1, and `quarshell-slogx` to v0.1.4.
+
 ### Changed
 
 - Run the rootful and rootless Podman 6 Linux API suites on Podman 6.1.4.

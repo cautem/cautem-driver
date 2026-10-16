@@ -5,8 +5,8 @@ go 1.27.0
 toolchain go1.27.2
 
 require (
-	github.com/cautem/quarshell-core v0.3.1-0.20261016151917-f75458088399
-	github.com/cautem/quarshell-proxy v0.3.1-0.20261016181953-cca79d795127
+	github.com/cautem/quarshell-core v0.3.1
+	github.com/cautem/quarshell-proxy v0.3.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
@@ -32,7 +32,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/NVIDIA/OpenShell/sdk/go v0.0.0-20261013191600-5a7728c304b5 // indirect
-	github.com/cautem/quarshell-slogx v0.1.4-0.20261016153436-5ec8e199a72f // indirect
+	github.com/cautem/quarshell-slogx v0.1.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
