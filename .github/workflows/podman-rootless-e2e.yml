@@ -30,6 +30,24 @@ jobs:
           repository: cautem/quarshell-core
           path: cautem-core
           ref: 59fec9b4e887827515979fe01303f2d7152a96f6
+      - name: Checkout Gateway E2E source
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/quarshell-gateway
+          path: cautem-gateway
+          ref: 47168e7540446c09db4f6faaf864077b83da905f
+      - name: Checkout published CLI helpers
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/quarshell-cli
+          path: cautem-cli
+          ref: v0.3.0
+      - name: Checkout published runtime helpers
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/quarshell-runtime
+          path: cautem-runtime
+          ref: v0.3.0
       - name: Configure Go workspace
         working-directory: ${{ github.workspace }}
         shell: bash
@@ -49,6 +67,9 @@ jobs:
           cache-dependency-path: |
             cautem-driver/go.sum
             cautem-core/go.sum
+            cautem-gateway/go.sum
+            cautem-cli/go.sum
+            cautem-runtime/go.sum
       - name: Build official Podman 6 E2E image
         run: docker build -f tests/e2e/podman/Containerfile.podman6 -t cautem-podman6-e2e:local .
       - name: Build rootless Podman E2E binary
@@ -166,6 +187,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Run Podman 6.1.4 rootless proxy isolation E2E
         run: bash tests/e2e/podman/run-policy-engine-e2e.sh rootless
+      - name: Run required rootless Gateway relay E2E
+        run: bash tests/e2e/podman/run-gateway-rootless-e2e.sh
       - name: Dump rootless Podman logs on failure
         if: failure()
         run: docker exec cautem-podman-rootless sh -lc 'cat /tmp/podman-rootless-service.log 2>/dev/null || true; podman --version 2>/dev/null || true' || true
