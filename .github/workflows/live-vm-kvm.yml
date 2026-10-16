@@ -3,8 +3,6 @@
 name: Live VM KVM acceptance
 
 on:
-  push:
-    branches: [test/kvm-hosted-gate-20261016]
   workflow_dispatch:
 
 permissions:
@@ -13,15 +11,12 @@ permissions:
 jobs:
   linux-kvm:
     name: Linux KVM lifecycle
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    runs-on: [self-hosted, linux, x64, cautem-kvm]
+    timeout-minutes: 20
+    env:
+      CAUTEM_VM_RUNTIME_DIR: ${{ vars.CAUTEM_VM_RUNTIME_DIR }}
+      CAUTEM_VM_BUILD_DIR: ${{ runner.temp }}/cautem-vm-runtime
     steps:
-      - name: Configure runtime paths
-        shell: bash
-        run: |
-          echo "CAUTEM_VM_RUNTIME_DIR=$RUNNER_TEMP/cautem-libkrun" >> "$GITHUB_ENV"
-          echo "CAUTEM_VM_BUILD_DIR=$RUNNER_TEMP/cautem-vm-runtime" >> "$GITHUB_ENV"
-
       - name: Checkout cautem-driver
         uses: actions/checkout@v4
         with:
@@ -69,32 +64,6 @@ jobs:
             cautem-driver/go.sum
             cautem-core/go.sum
             cautem-runtime/go.sum
-
-      - name: Prepare KVM and pinned libkrun bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -c /dev/kvm
-          sudo chmod a+rw /dev/kvm
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends patchelf libc6-dev e2fsprogs libclang-dev
-          mkdir -p "$CAUTEM_VM_RUNTIME_DIR"
-          curl --fail --location --silent --show-error \
-            https://github.com/libkrun/libkrunfw/releases/download/v5.6.2/libkrunfw-x86_64.tgz \
-            --output "$RUNNER_TEMP/libkrunfw-x86_64.tgz"
-          printf '%s  %s\n' \
-            016c32ddb2a28aa300382cab33352d63a41a901eb36ee8d1ca24b389791c8b91 \
-            "$RUNNER_TEMP/libkrunfw-x86_64.tgz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/libkrunfw-x86_64.tgz" -C "$CAUTEM_VM_RUNTIME_DIR" --strip-components=2
-          git clone --depth 1 --branch v1.19.6 \
-            https://github.com/libkrun/libkrun.git "$RUNNER_TEMP/libkrun-source"
-          test "$(git -C "$RUNNER_TEMP/libkrun-source" rev-parse HEAD)" = \
-            227b2de6ed323fe180e02f871c5f325a90c13cc2
-          make -C "$RUNNER_TEMP/libkrun-source" -j2
-          install -m 0755 "$RUNNER_TEMP/libkrun-source/target/release/libkrun.so.1.19.6" \
-            "$CAUTEM_VM_RUNTIME_DIR/libkrun.so"
-          test -s "$CAUTEM_VM_RUNTIME_DIR/libkrunfw.so.5"
-          test -s "$CAUTEM_VM_RUNTIME_DIR/libkrun.so"
 
       - name: Verify Linux KVM and run live VM lifecycle
         working-directory: cautem-driver
