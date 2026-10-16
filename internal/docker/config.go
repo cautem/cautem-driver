@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cautem/cautem-core/resourceadmission"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/internal/certbundle"
 )
 

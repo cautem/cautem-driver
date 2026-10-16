@@ -15,8 +15,8 @@ import (
 	"github.com/moby/moby/client"
 	"golang.org/x/term"
 
-	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-core/defaults"
+	core "github.com/cautem/quarshell-core"
+	"github.com/cautem/quarshell-core/defaults"
 	"github.com/cautem/quarshell-driver/driver"
 	"github.com/cautem/quarshell-driver/internal/mounts"
 )

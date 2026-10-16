@@ -54,8 +54,8 @@ jobs:
           )
 
           replace (
-            github.com/cautem/cautem-core v0.1.0-alpha.1 => ./cautem-core
-            github.com/cautem/cautem-core v0.3.0 => ./cautem-core
+            github.com/cautem/quarshell-core v0.1.0-alpha.1 => ./cautem-core
+            github.com/cautem/quarshell-core v0.3.0 => ./cautem-core
           )
           EOF
 

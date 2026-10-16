@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 	"github.com/cautem/quarshell-driver/driver"
 )
 

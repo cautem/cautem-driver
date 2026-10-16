@@ -17,8 +17,8 @@ import (
 
 	"path/filepath"
 
-	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-core/defaults"
+	core "github.com/cautem/quarshell-core"
+	"github.com/cautem/quarshell-core/defaults"
 	"github.com/cautem/quarshell-driver/driver"
 )
 

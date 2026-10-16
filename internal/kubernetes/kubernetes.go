@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cautem/cautem-core"
+	"github.com/cautem/quarshell-core"
 	"github.com/cautem/quarshell-driver/driver"
 	"k8s.io/client-go/dynamic"
 )

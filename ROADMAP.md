@@ -1,6 +1,6 @@
 # Roadmap — cautem-driver
 
-Status: **v0.3.0** (release prepared) · Depends on [cautem-core](https://github.com/cautem/cautem-core) `v0.3.0` and cautem-proxy `v0.3.0`
+Status: **v0.3.0** (release prepared) · Depends on [cautem-core](https://github.com/cautem/quarshell-core) `v0.3.0` and cautem-proxy `v0.3.0`
 
 ## This module
 

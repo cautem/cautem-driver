@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 	"github.com/moby/moby/client"
 )
 

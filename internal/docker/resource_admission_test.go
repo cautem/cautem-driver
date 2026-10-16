@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cautem/cautem-core/resourceadmission"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/driver"
 	"github.com/moby/moby/api/types/container"
 	enginemount "github.com/moby/moby/api/types/mount"

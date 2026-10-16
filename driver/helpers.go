@@ -5,7 +5,7 @@ import (
 
 	"github.com/docker/go-units"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 	"github.com/cautem/quarshell-driver/internal/mounts"
 	"github.com/cautem/quarshell-driver/internal/sidecar"
 )

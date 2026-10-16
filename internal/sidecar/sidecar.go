@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 )
 
 // EnsureLinuxCLI builds (if needed) a linux/$GOARCH cautem binary for mounting into the proxy sidecar.

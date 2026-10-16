@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cautem/cautem-core/resourceadmission"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/driver"
 	enginemount "github.com/moby/moby/api/types/mount"
 )

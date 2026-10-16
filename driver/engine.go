@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 )
 
 // ImageBuildRequest describes a local Engine image build. Context is a tar

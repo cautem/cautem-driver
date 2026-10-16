@@ -13,7 +13,7 @@ import (
 	"archive/tar"
 	"path/filepath"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 )
 
 // CopyTo tars srcHost and extracts at destPath inside the container.

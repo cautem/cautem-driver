@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 )
 
 func TestCABundleEnvIncludesGit(t *testing.T) {

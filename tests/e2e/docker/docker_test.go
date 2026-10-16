@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-core/resourceadmission"
+	"github.com/cautem/quarshell-core"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/driver"
 	docker "github.com/cautem/quarshell-driver/internal/docker"
 	"github.com/moby/moby/api/types/container"

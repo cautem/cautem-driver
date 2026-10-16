@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/cautem/cautem-core"
+	"github.com/cautem/quarshell-core"
 )
 
 // SupervisorControlSocketName is mounted inside the shared SSH directory so

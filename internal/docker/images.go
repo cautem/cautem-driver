@@ -10,7 +10,7 @@ import (
 
 	"github.com/moby/moby/client"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 )
 
 // ImagePresent reports whether ref exists locally (no pull).

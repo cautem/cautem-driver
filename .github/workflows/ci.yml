@@ -343,8 +343,8 @@ jobs:
             echo '  ./cautem-driver'
             echo '  ./cautem-runtime'
             echo ')'
-            echo 'replace github.com/cautem/cautem-core v0.1.0-alpha.1 => ./cautem-core'
-            echo 'replace github.com/cautem/cautem-core v0.3.0 => ./cautem-core'
+            echo 'replace github.com/cautem/quarshell-core v0.1.0-alpha.1 => ./cautem-core'
+            echo 'replace github.com/cautem/quarshell-core v0.3.0 => ./cautem-core'
           } > "${{ github.workspace }}/go.work"
 
       - uses: actions/setup-go@v5

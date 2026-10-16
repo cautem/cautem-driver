@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
