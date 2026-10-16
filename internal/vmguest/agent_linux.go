@@ -1087,6 +1087,13 @@ func guestWorkloadCredential(declaration string, defaultUID, defaultGID uint32) 
 			groups = append(groups, groupID)
 		}
 	}
+	// Avoid a privileged setuid/setgid transition when the guest agent already
+	// runs as the requested identity. This is the same effective workload
+	// identity and supports unprivileged environments where re-applying the
+	// current IDs is denied by the host.
+	if uid == uint32(os.Geteuid()) && gid == uint32(os.Getegid()) && len(groups) == 0 {
+		return nil, nil
+	}
 	return &syscall.Credential{Uid: uid, Gid: gid, Groups: groups}, nil
 }
 

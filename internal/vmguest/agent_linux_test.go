@@ -172,6 +172,9 @@ func TestGuestWorkloadEnvironmentForcesPolicyBrokerAndDropsControlValues(t *test
 }
 
 func TestGuestWorkloadCredentialAppliesOCIUserFailClosed(t *testing.T) {
+	if credential, err := guestWorkloadCredential("", uint32(os.Geteuid()), uint32(os.Getegid())); err != nil || credential != nil {
+		t.Fatalf("current guest identity credential = %+v, %v; want no-op", credential, err)
+	}
 	defaultCredential, err := guestWorkloadCredential("", 1000, 1001)
 	if err != nil || defaultCredential.Uid != 1000 || defaultCredential.Gid != 1001 {
 		t.Fatalf("default credential = %+v, %v", defaultCredential, err)

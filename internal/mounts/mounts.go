@@ -57,9 +57,21 @@ func ResolveWorkspaceSource(path string, iKnow bool) (WorkspaceSource, error) {
 	if err != nil {
 		return WorkspaceSource{}, fmt.Errorf("workspace: resolve path: %w", err)
 	}
-	fi, err := os.Stat(canonical)
+	// Stat a directory handle instead of a path lookup. On Windows, os.Stat
+	// leaves file identity resolution lazy until os.SameFile; retaining only
+	// that FileInfo would let a later path replacement change both identities
+	// before the comparison. File.Stat captures the original file ID eagerly.
+	dir, err := os.Open(canonical)
 	if err != nil {
 		return WorkspaceSource{}, fmt.Errorf("workspace: %w", err)
+	}
+	fi, statErr := dir.Stat()
+	closeErr := dir.Close()
+	if statErr != nil {
+		return WorkspaceSource{}, fmt.Errorf("workspace: stat directory: %w", statErr)
+	}
+	if closeErr != nil {
+		return WorkspaceSource{}, fmt.Errorf("workspace: close directory: %w", closeErr)
 	}
 	if !fi.IsDir() {
 		return WorkspaceSource{}, fmt.Errorf("workspace: not a directory: %s", abs)
