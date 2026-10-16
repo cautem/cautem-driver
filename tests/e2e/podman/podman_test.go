@@ -178,18 +178,17 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err != nil || !proxyNetwork.Network.Internal {
 		t.Fatalf("actual Podman sandbox network internal=%v err=%v; want Internal=true", proxyNetwork.Network.Internal, err)
 	}
+	if len(proxyNetwork.Network.IPAM.Config) == 0 || !proxyNetwork.Network.IPAM.Config[0].Gateway.IsValid() {
+		t.Fatalf("Podman 6 policy network has no inspectable gateway: %+v", proxyNetwork.Network.IPAM.Config)
+	}
+	hostTarget, closeHostTarget := startPodmanHostGatewayProbeTarget(t, ctx, engineClient, image, proxyNetwork.Network.IPAM.Config[0].Gateway.String())
+	defer closeHostTarget()
+	if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("Podman sandbox reached host gateway directly at %s: result=%+v err=%v", hostTarget, result, err)
+	}
 	proxyInfo, err := engineClient.ContainerInspect(ctx, "cautem-proxy-"+name, client.ContainerInspectOptions{})
 	if err != nil {
 		t.Fatalf("inspect Podman policy proxy sidecar: %v", err)
-	}
-	hostTarget := ""
-	if len(proxyNetwork.Network.IPAM.Config) > 0 && proxyNetwork.Network.IPAM.Config[0].Gateway.IsValid() {
-		var closeHostTarget func()
-		hostTarget, closeHostTarget = startPodmanHostGatewayProbeTarget(t, ctx, engineClient, image, proxyNetwork.Network.IPAM.Config[0].Gateway.String())
-		defer closeHostTarget()
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
-			t.Fatalf("Podman sandbox reached host gateway directly at %s: result=%+v err=%v", hostTarget, result, err)
-		}
 	}
 	for _, probe := range [][]string{{"probe-tcp", probeTarget}, {"probe-udp", strings.TrimSuffix(probeTarget, ":17777") + ":17778"}} {
 		result, err := engine.Exec(ctx, core.ID(proxyInfo.Container.ID), driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cautem-tcp-echo"}, probe...)})
@@ -197,16 +196,14 @@ func TestPodmanEngineE2E(t *testing.T) {
 			t.Fatalf("Podman policy sidecar could not reach control listener via bridge: probe=%v exit=%d err=%v", probe, result.ExitCode, err)
 		}
 	}
-	if hostTarget != "" {
-		if _, err := engineClient.ContainerKill(ctx, proxyInfo.Container.ID, client.ContainerKillOptions{Signal: "KILL"}); err != nil {
-			t.Fatalf("stop proxy before host-gateway failure probe: %v", err)
-		}
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
-			t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
-		}
-		if err := engine.Start(ctx, h.ID); err != nil {
-			t.Fatalf("restart sandbox policy proxy after host-gateway failure probe: %v", err)
-		}
+	if _, err := engineClient.ContainerKill(ctx, proxyInfo.Container.ID, client.ContainerKillOptions{Signal: "KILL"}); err != nil {
+		t.Fatalf("stop proxy before host-gateway failure probe: %v", err)
+	}
+	if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
+	}
+	if err := engine.Start(ctx, h.ID); err != nil {
+		t.Fatalf("restart sandbox policy proxy after host-gateway failure probe: %v", err)
 	}
 	for _, probe := range [][]string{
 		{"probe-connect", probeTarget},

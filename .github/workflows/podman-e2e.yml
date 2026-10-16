@@ -76,3 +76,5 @@ jobs:
             echo "- Required tests passed: 4 (lifecycle, service recovery, pull policy, digest pinning)"
             echo "- Rootless coverage: not included in this job"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run Podman 6.1.4 rootful proxy isolation E2E
+        run: bash tests/e2e/podman/run-policy-engine-e2e.sh rootful

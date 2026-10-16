@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 the cautem authors
+# SPDX-License-Identifier: Apache-2.0
+
+ARG DEBIAN_BASE=mirror.gcr.io/library/debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+FROM ${DEBIAN_BASE}
+
+ARG E2E_USER=sandbox
+COPY --chmod=0555 tcp-echo /usr/local/bin/cautem-tcp-echo
+RUN printf 'sandbox:x:1000:1000:Sandbox:/sandbox:/bin/sh\n' >> /etc/passwd \
+    && printf 'sandbox:x:1000:\n' >> /etc/group \
+    && mkdir -p /sandbox /workspace /cautem/data /openshell-volume \
+    && chown -R sandbox:sandbox /sandbox /workspace /cautem/data /openshell-volume
+
+WORKDIR /workspace
+USER ${E2E_USER}
