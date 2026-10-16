@@ -17,8 +17,8 @@ import (
 
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/defaults"
-	"github.com/cautem/cautem-driver/driver"
-	"github.com/cautem/cautem-driver/internal/mounts"
+	"github.com/cautem/quarshell-driver/driver"
+	"github.com/cautem/quarshell-driver/internal/mounts"
 )
 
 // Exec runs a command in the container. With TTY, attaches stdin/stdout in raw mode.

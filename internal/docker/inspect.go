@@ -9,7 +9,7 @@ import (
 	"github.com/moby/moby/client"
 
 	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 // List returns cautem sandbox containers (excludes proxy sidecars).

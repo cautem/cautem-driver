@@ -14,8 +14,8 @@ import (
 	"sync"
 
 	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-driver/driver"
-	"github.com/cautem/cautem-driver/internal/vmguest"
+	"github.com/cautem/quarshell-driver/driver"
+	"github.com/cautem/quarshell-driver/internal/vmguest"
 )
 
 const (

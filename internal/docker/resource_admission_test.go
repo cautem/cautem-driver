@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 	"github.com/moby/moby/api/types/container"
 	enginemount "github.com/moby/moby/api/types/mount"
 	volumetypes "github.com/moby/moby/api/types/volume"

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

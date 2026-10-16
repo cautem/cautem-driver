@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	docker "github.com/cautem/cautem-driver/internal/docker"
+	docker "github.com/cautem/quarshell-driver/internal/docker"
 )
 
 const podmanAPIVersion = "v5.0.0"

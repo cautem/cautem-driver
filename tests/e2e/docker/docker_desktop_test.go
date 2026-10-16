@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cautem-driver/driver"
-	docker "github.com/cautem/cautem-driver/internal/docker"
+	"github.com/cautem/quarshell-driver/driver"
+	docker "github.com/cautem/quarshell-driver/internal/docker"
 	"github.com/moby/moby/client"
 )
 

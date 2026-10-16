@@ -5,10 +5,10 @@
   Docker-first sandbox runtime — mounts, ExtraHosts, egress sidecar wiring.
 </p>
 <p align="center">
-  <a href="https://github.com/cautem/cautem-driver/actions/workflows/ci.yml"><img src="https://github.com/cautem/cautem-driver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://pkg.go.dev/github.com/cautem/cautem-driver"><img src="https://pkg.go.dev/badge/github.com/cautem/cautem-driver.svg" alt="Go Reference"></a>
+  <a href="https://github.com/cautem/quarshell-driver/actions/workflows/ci.yml"><img src="https://github.com/cautem/quarshell-driver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://pkg.go.dev/github.com/cautem/quarshell-driver"><img src="https://pkg.go.dev/badge/github.com/cautem/quarshell-driver.svg" alt="Go Reference"></a>
   <a href="https://www.apache.org/licenses/LICENSE-2.0"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/cautem/cautem-driver"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
+  <a href="https://github.com/cautem/quarshell-driver"><img src="https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go" alt="Go Version"></a>
 </p>
 <p align="center">
   <sub>Part of the <a href="https://github.com/cautem">cautem / cautem</a> ecosystem</sub>
@@ -53,8 +53,8 @@ cover the client code; keep the Engine daemon updated independently.
 
 ```go
 import (
-    "github.com/cautem/cautem-driver/driver"
-    _ "github.com/cautem/cautem-driver/driver/all" // register backends
+    "github.com/cautem/quarshell-driver/driver"
+    _ "github.com/cautem/quarshell-driver/driver/all" // register backends
 )
 
 d, err := driver.OpenEngine("docker")
@@ -246,7 +246,7 @@ does not implement instead of silently ignoring it.
 | Roadmap | [ROADMAP.md](./ROADMAP.md) |
 | Organization | [https://github.com/cautem](https://github.com/cautem) |
 | Organization overview | [github.com/cautem](https://github.com/cautem) |
-| pkg.go.dev | [`github.com/cautem/cautem-driver`](https://pkg.go.dev/github.com/cautem/cautem-driver) |
+| pkg.go.dev | [`github.com/cautem/quarshell-driver`](https://pkg.go.dev/github.com/cautem/quarshell-driver) |
 
 ## License
 

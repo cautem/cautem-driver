@@ -9,7 +9,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 
 	"github.com/cautem/cautem-core/defaults"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 // ValidateGPURequest enforces the pinned OpenShell relationship between a

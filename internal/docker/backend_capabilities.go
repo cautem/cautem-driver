@@ -1,6 +1,6 @@
 package docker
 
-import "github.com/cautem/cautem-driver/driver"
+import "github.com/cautem/quarshell-driver/driver"
 
 func (d *Driver) BackendCapabilityInfo() driver.BackendInfo {
 	backendID := "docker"

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 func TestDockerEngineUsesMutualTLSFromEnvironment(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cautem/cautem-driver/internal/vmguest"
+	"github.com/cautem/quarshell-driver/internal/vmguest"
 	"io"
 	"net"
 )

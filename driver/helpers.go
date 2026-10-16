@@ -6,8 +6,8 @@ import (
 	"github.com/docker/go-units"
 
 	"github.com/cautem/cautem-core/defaults"
-	"github.com/cautem/cautem-driver/internal/mounts"
-	"github.com/cautem/cautem-driver/internal/sidecar"
+	"github.com/cautem/quarshell-driver/internal/mounts"
+	"github.com/cautem/quarshell-driver/internal/sidecar"
 )
 
 // WorkdirInContainer is where the host workspace is mounted in the guest.

@@ -16,9 +16,9 @@ import (
 
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/driver"
-	podman "github.com/cautem/cautem-driver/internal/podman"
-	"github.com/cautem/cautem-driver/tests/internal/testenv"
+	"github.com/cautem/quarshell-driver/driver"
+	podman "github.com/cautem/quarshell-driver/internal/podman"
+	"github.com/cautem/quarshell-driver/tests/internal/testenv"
 	"github.com/moby/moby/client"
 )
 

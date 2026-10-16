@@ -1,6 +1,6 @@
 package podman
 
-import "github.com/cautem/cautem-driver/driver"
+import "github.com/cautem/quarshell-driver/driver"
 
 func init() {
 	driver.Register("podman", func() (driver.ComputeDriver, error) {

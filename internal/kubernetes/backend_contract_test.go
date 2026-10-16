@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 // These cases translate OpenShell's driver_config_* tests in

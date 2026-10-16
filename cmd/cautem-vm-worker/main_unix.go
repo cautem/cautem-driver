@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cautem/cautem-driver/internal/vm"
+	"github.com/cautem/quarshell-driver/internal/vm"
 )
 
 func main() {

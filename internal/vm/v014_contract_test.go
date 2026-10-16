@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 // These cases translate OpenShell's validate_vm_sandbox_* tests in

@@ -11,11 +11,6 @@ if [ "$host_os/$host_arch" != darwin/arm64 ]; then
   echo "live Hypervisor.framework acceptance requires native macOS/arm64; found $host_os/$host_arch" >&2
   exit 2
 fi
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required to prepare the default Alpine Linux rootfs" >&2
-  exit 2
-fi
-
 build_dir=${CAUTEM_VM_BUILD_DIR:-"$module_dir/dist/vm-live-darwin-arm64"}
 mkdir -p "$build_dir"
 
@@ -64,6 +59,10 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 if [ ! -s "$rootfs_tar" ]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is required to prepare the default Alpine Linux rootfs" >&2
+    exit 2
+  fi
   container_id=$(docker run -d --platform "linux/$guest_arch" alpine:3.22 /bin/sh -c 'while :; do sleep 3600; done')
   docker exec "$container_id" adduser -D -u 1000 sandbox
   docker stop "$container_id" >/dev/null

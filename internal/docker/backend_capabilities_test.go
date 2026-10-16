@@ -3,7 +3,7 @@ package docker
 import (
 	"testing"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 func TestBackendCapabilityInfoReportsConfiguredBackendAndExtensions(t *testing.T) {

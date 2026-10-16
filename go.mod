@@ -1,4 +1,4 @@
-module github.com/cautem/cautem-driver
+module github.com/cautem/quarshell-driver
 
 go 1.27.0
 

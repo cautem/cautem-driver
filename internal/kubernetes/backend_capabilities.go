@@ -1,6 +1,6 @@
 package kubernetes
 
-import "github.com/cautem/cautem-driver/driver"
+import "github.com/cautem/quarshell-driver/driver"
 
 func (*Driver) BackendCapabilityInfo() driver.BackendInfo {
 	return driver.BackendInfo{

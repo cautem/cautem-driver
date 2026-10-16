@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/internal/certbundle"
+	"github.com/cautem/quarshell-driver/internal/certbundle"
 )
 
 // ConfigFromMap decodes the Docker fields currently consumed by the shared
