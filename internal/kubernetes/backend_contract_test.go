@@ -12,7 +12,7 @@ import (
 // crates/openshell-driver-kubernetes/src/driver.rs (pinned upstream commit
 // 77c5ff6e20c98b3674616ecf35b2464f2b8e57ca). Runtime provisioning remains a
 // separate unimplemented contract.
-func TestOpenShellDriverConfigValidationContract(t *testing.T) {
+func TestCompatDriverConfigValidationContract(t *testing.T) {
 	tests := []struct {
 		name, config, want string
 	}{
@@ -121,7 +121,7 @@ func TestOpenShellDriverConfigValidationContract(t *testing.T) {
 	}
 }
 
-func TestOpenShellDriverConfigDefaultsPVCAndMountsToReadOnly(t *testing.T) {
+func TestCompatDriverConfigDefaultsPVCAndMountsToReadOnly(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{"volumes":[{"name":"user-data","persistent_volume_claim":{"claim_name":"pvc.user-data.123"}}],"containers":{"agent":{"volume_mounts":[{"name":"user-data","mount_path":"/sandbox/.openshell/workspace","sub_path":"workspace"}]}}}`)
 	if err != nil {
 		t.Fatalf("ParseSandboxDriverConfig() error = %v", err)
@@ -134,7 +134,7 @@ func TestOpenShellDriverConfigDefaultsPVCAndMountsToReadOnly(t *testing.T) {
 	}
 }
 
-func TestOpenShellDriverConfigAcceptsDNSSubdomainClaimAndTrailingMountSlash(t *testing.T) {
+func TestCompatDriverConfigAcceptsDNSSubdomainClaimAndTrailingMountSlash(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{"volumes":[{"name":"user-data","persistent_volume_claim":{"claim_name":"pvc.user-data.123"}}],"containers":{"agent":{"volume_mounts":[{"name":"user-data","mount_path":"/sandbox/.openshell/workspace/"}]}}}`)
 	if err != nil {
 		t.Fatalf("ParseSandboxDriverConfig() error = %v; OpenShell accepts a trailing mount slash", err)
@@ -144,7 +144,7 @@ func TestOpenShellDriverConfigAcceptsDNSSubdomainClaimAndTrailingMountSlash(t *t
 	}
 }
 
-func TestOpenShellDriverConfigAcceptsReadWritePVCWithMultipleSubpathMounts(t *testing.T) {
+func TestCompatDriverConfigAcceptsReadWritePVCWithMultipleSubpathMounts(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{"volumes":[{"name":"user-data","persistent_volume_claim":{"claim_name":"pvc-user-data","read_only":false}}],"containers":{"agent":{"volume_mounts":[{"name":"user-data","mount_path":"/sandbox/.openshell/workspace","sub_path":"workspace","read_only":false},{"name":"user-data","mount_path":"/sandbox/.openshell/memory","sub_path":"memory","read_only":false},{"name":"user-data","mount_path":"/sandbox/.openshell/sessions","sub_path":"sessions","read_only":false}]}}}`)
 	if err != nil {
 		t.Fatalf("ParseSandboxDriverConfig() error = %v; want writable PVC with multiple subpaths", err)
@@ -162,7 +162,7 @@ func TestOpenShellDriverConfigAcceptsReadWritePVCWithMultipleSubpathMounts(t *te
 	}
 }
 
-func TestOpenShellDriverConfigRejectsEveryManagedVolumeName(t *testing.T) {
+func TestCompatDriverConfigRejectsEveryManagedVolumeName(t *testing.T) {
 	for _, name := range []string{
 		"openshell-client-tls",
 		"openshell-upstream-proxy-auth",

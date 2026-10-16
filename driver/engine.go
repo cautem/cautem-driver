@@ -2,9 +2,25 @@ package driver
 
 import (
 	"context"
+	"io"
 
 	core "github.com/cautem/cautem-core"
 )
+
+// ImageBuildRequest describes a local Engine image build. Context is a tar
+// archive rooted at the build context; Dockerfile is relative to that root.
+type ImageBuildRequest struct {
+	Context    io.Reader
+	Dockerfile string
+	Tag        string
+	Output     io.Writer
+}
+
+// ImageBuilder is an optional Engine capability for building a local source
+// directory into an image before creating a sandbox.
+type ImageBuilder interface {
+	BuildImage(context.Context, ImageBuildRequest) error
+}
 
 // Probe is a host-side Docker/Podman readiness report for `cautem health`.
 type Probe struct {
@@ -40,12 +56,42 @@ type RootfsTarStager interface {
 	RootfsTarStaging(ctx context.Context) (directory string, maxBytes uint64, err error)
 }
 
+// SpecValidator is an optional preflight capability for backends that can
+// identify unsupported sandbox guarantees before they allocate resources.
+// Gateways should call it before persisting lifecycle state or consuming
+// one-shot provisioning inputs.
+type SpecValidator interface {
+	ValidateSpec(spec Spec) error
+}
+
+// ContextSpecValidator is the cancellable preflight contract preferred by the
+// Backend adapter. It lets drivers perform bounded, read-only engine checks
+// before the Gateway persists a sandbox record or consumes one-shot inputs.
+type ContextSpecValidator interface {
+	ValidateSpecContext(context.Context, Spec) error
+}
+
+// GatewayRuntimeValidator is an optional capability for local backends whose
+// runtime cannot satisfy the Gateway's mandatory supervisor, workspace, and
+// policy lifecycle contract. Gateways should check it before consuming
+// one-shot provisioning inputs.
+type GatewayRuntimeValidator interface {
+	ValidateGatewayRuntime() error
+}
+
 // TokenAwareStarter lets a backend replace credentials that are mounted into a
 // stopped runtime before it starts again. Gateways should mint a fresh token
 // for each restart and call this capability only after the previous runtime
 // has been stopped.
 type TokenAwareStarter interface {
 	StartWithToken(ctx context.Context, id core.ID, token string) error
+}
+
+// LaunchSpecRestorer lets a durable control plane restore process-local
+// workload argv/environment after its compute driver process has restarted.
+// Implementations must not persist the supplied environment in backend state.
+type LaunchSpecRestorer interface {
+	RestoreLaunchSpec(ctx context.Context, id core.ID, spec Spec) error
 }
 
 // SandboxPolicyUpdater lets a compute backend deliver a new policy when its

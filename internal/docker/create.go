@@ -3,6 +3,9 @@ package docker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/netip"
 	"os"
@@ -11,13 +14,16 @@ import (
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	enginemount "github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
+	volumetypes "github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 
 	"path/filepath"
 
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/driver"
 	"github.com/cautem/cautem-driver/internal/mounts"
 	"github.com/cautem/cautem-driver/internal/sidecar"
@@ -25,16 +31,16 @@ import (
 
 // Create ensures network + optional proxy sidecar + sandbox container (not started).
 func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, error) {
-	if d == nil || d.cli == nil {
-		return driver.Handle{}, fmt.Errorf("docker driver: client not initialized")
-	}
-	if err := ValidateGPURequest(spec); err != nil {
-		return driver.Handle{}, fmt.Errorf("docker gpu: %w", err)
-	}
-	driverCDIDevices, hasDriverCDIDevices, driverMounts, driverBinds, err := parseDockerSandboxDriverConfig(spec.DriverConfigJSON, d.enableBindMounts)
+	validated, err := d.validateCreate(ctx, spec)
 	if err != nil {
 		return driver.Handle{}, err
 	}
+	driverCDIDevices := validated.cdiDevices
+	hasDriverCDIDevices := validated.hasCDIDevices
+	driverMounts := validated.mounts
+	driverBinds := validated.binds
+	resourceIdentities := validated.resourceIdentities
+	configUsed := validated.configUsed
 	if hasDriverCDIDevices {
 		spec.CDIDevices = driverCDIDevices
 	}
@@ -71,10 +77,11 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 			img = d.defaultSandboxImage(ctx, spec.DisplayMode, spec.GPU)
 		}
 	}
-	ws, err := mounts.ResolveWorkspace(spec.Workspace, spec.IKnow)
+	workspaceSource, err := mounts.ResolveWorkspaceSource(spec.Workspace, spec.IKnow)
 	if err != nil {
 		return driver.Handle{}, err
 	}
+	ws := workspaceSource.Path
 	netPrefix := strings.TrimSpace(d.runtimeConfig.NetworkName)
 	if netPrefix == "" {
 		netPrefix = "cautem-net"
@@ -83,6 +90,13 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	ctrName := "cautem-" + name
 	withProxy := strings.TrimSpace(spec.ProxyBin) != ""
 	withSupervisor := strings.TrimSpace(spec.SupervisorBin) != ""
+	restartPolicy, err := driver.NormalizeMainProcessRestartPolicy(spec.MainProcessRestartPolicy)
+	if err != nil {
+		return driver.Handle{}, fmt.Errorf("docker driver: %w", err)
+	}
+	if !withSupervisor && restartPolicy != "never" {
+		return driver.Handle{}, fmt.Errorf("docker driver: main process restart policy requires cautem-supervisor")
+	}
 	var caVol string
 	if withSupervisor {
 		if strings.TrimSpace(spec.InitBin) == "" || spec.PolicyPath == "" {
@@ -158,6 +172,9 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	// Driver identity metadata is trusted only when derived from the exact
 	// inspected image. Callers cannot spoof it through sandbox environment input.
 	env := filterIdentityEnv(spec.Env)
+	if withSupervisor {
+		env = mergeEnv(env, []string{driver.MainProcessRestartPolicyEnv + "=" + restartPolicy})
+	}
 	ociImageUser := ""
 	if imageInfo.Config != nil {
 		ociImageUser = imageInfo.Config.User
@@ -190,6 +207,16 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 			return driver.Handle{}, err
 		}
 		proxyCreated = true
+		if d.runtimeConfig.BackendID == "podman" {
+			// Podman 6's fail-closed blackhole route targets the internal
+			// network gateway, which also serves container-name DNS. Give the
+			// workload the sidecar's reserved address directly so proxy access
+			// does not depend on that intentionally unreachable resolver.
+			proxyHost, err = d.ContainerIP(ctx, "cautem-proxy-"+name, netName)
+			if err != nil {
+				return driver.Handle{}, fmt.Errorf("podman proxy sidecar address: %w", err)
+			}
+		}
 		env = mergeEnv(env, sidecar.ProxyEnv(proxyHost, port))
 		env = mergeEnv(env, sidecar.CABundleEnv(defaults.GuestCAFile))
 	}
@@ -215,6 +242,23 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		}
 		labels[k] = v
 	}
+	if configUsed {
+		labels["cautem.internal/driver-config-used"] = "true"
+	} else {
+		labels["cautem.internal/driver-config-used"] = "false"
+	}
+	containsUnlabelable := false
+	for _, mount := range driverMounts {
+		if mount.Type == enginemount.TypeBind || mount.Type == enginemount.TypeImage {
+			containsUnlabelable = true
+		}
+	}
+	labels["cautem.internal/driver-config-unlabelable"] = strconv.FormatBool(containsUnlabelable)
+	encodedIdentities, err := json.Marshal(resourceIdentities)
+	if err != nil || len(encodedIdentities) > 4096 {
+		return driver.Handle{}, fmt.Errorf("docker driver: resource admission identity record exceeds label limit")
+	}
+	labels["cautem.internal/resource-admission-identities"] = string(encodedIdentities)
 	if namespace := strings.TrimSpace(d.runtimeConfig.SandboxNamespace); namespace != "" {
 		labels["openshell.ai/sandbox-namespace"] = namespace
 	}
@@ -315,6 +359,8 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	cfg := &container.Config{
 		Image:      imageInfo.ID,
 		Cmd:        cmd,
+		Tty:        spec.TTY,
+		OpenStdin:  spec.TTY,
 		Env:        env,
 		Labels:     labels,
 		WorkingDir: mounts.WorkdirInContainer,
@@ -344,18 +390,22 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		cfg.Cmd = append([]string{"--", "/cautem/cautem-init", "--policy", "/cautem/policy.yaml", "--"}, workloadCmd...)
 		cfg.User = "0"
 	}
+	securityOpts := []string{"no-new-privileges:true"}
+	if appArmor, ok := d.runtimeConfig.AppArmorProfile.OCISecurityOption(); ok {
+		securityOpts = append(securityOpts, appArmor)
+	}
 	host := &container.HostConfig{
 		Binds:       binds,
 		Mounts:      driverMounts,
 		NetworkMode: container.NetworkMode(netName),
 		// Never mount docker.sock into the sandbox.
 		// Docker default seccomp stays on (do not set seccomp=unconfined).
-		SecurityOpt: []string{"no-new-privileges:true"},
+		SecurityOpt: securityOpts,
 		CapDrop:     []string{"NET_RAW"},
 		// Do not give the sandbox a host-gateway alias. Only the proxy sidecar
 		// needs that route for gateway-owned control traffic.
 		ExtraHosts: append([]string{}, spec.ExtraHosts...),
-		LogConfig:  sandboxLogConfig(),
+		LogConfig:  sandboxLogConfig(d.runtimeConfig.LogDriver),
 		Resources:  container.Resources{PidsLimit: resolvePidsLimit(d.configuredPidsLimit(spec.PidsLimit))},
 	}
 	cpu := spec.CPU
@@ -423,12 +473,22 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	if spec.MemoryBytes > 0 {
 		host.Memory = spec.MemoryBytes
 	}
-	networking := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			netName: {},
-		},
+	workloadEndpoint := &network.EndpointSettings{Aliases: []string{ctrName}}
+	if d.runtimeConfig.BackendID == "podman" && withProxy {
+		_, sandboxIP, err := d.staticPodmanNetworkIPs(ctx, netName)
+		if err != nil {
+			return driver.Handle{}, fmt.Errorf("docker create %s: reserve Podman isolated-network address: %w", ctrName, err)
+		}
+		workloadEndpoint.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: sandboxIP}
 	}
+	networking := &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{netName: workloadEndpoint}}
 	createOpts := client.ContainerCreateOptions{Config: cfg, HostConfig: host, NetworkingConfig: networking, Name: ctrName}
+	// The Engine API accepts a path, not an open directory handle. Recheck the
+	// canonical directory identity after image/network/sidecar preparation so a
+	// path replacement during that work fails closed before the bind is created.
+	if err := workspaceSource.VerifyUnchanged(); err != nil {
+		return driver.Handle{}, fmt.Errorf("docker driver: %w", err)
+	}
 	var resp client.ContainerCreateResult
 	if d.runtimeConfig.NativeContainerCreate != nil {
 		resp, err = d.runtimeConfig.NativeContainerCreate(ctx, createOpts)
@@ -448,6 +508,64 @@ func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 		Network: netName,
 		Image:   img,
 	}, nil
+}
+
+func (d *Driver) validateExternalDriverMounts(ctx context.Context, spec driver.Spec, requested []enginemount.Mount, policy resourceadmission.Config) (map[string]string, error) {
+	identities := make(map[string]string)
+	if err := policy.Validate(); err != nil {
+		return nil, fmt.Errorf("docker resource admission policy: %w", err)
+	}
+	workspace := strings.TrimSpace(spec.Labels[driver.WorkspaceLabel])
+	for _, mount := range requested {
+		switch mount.Type {
+		case enginemount.TypeBind, enginemount.TypeImage:
+			if err := policy.RejectUnlabelable("host bind or image mount"); err != nil {
+				return nil, err
+			}
+		case enginemount.TypeVolume:
+			volume, err := d.cli.VolumeInspect(ctx, mount.Source, client.VolumeInspectOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("inspect docker volume %q for resource admission: %w", mount.Source, err)
+			}
+			if err := policy.Admit(workspace, volume.Volume.Labels); err != nil {
+				return nil, fmt.Errorf("docker volume %q: %w", mount.Source, err)
+			}
+			if !d.enableBindMounts && dockerVolumeIsBindBacked(volume.Volume.Driver, volume.Volume.Options) {
+				return nil, fmt.Errorf("docker volume %q is backed by a host bind mount and requires enable_bind_mounts = true", mount.Source)
+			}
+			identities[mount.Source] = dockerVolumeIdentity(volume.Volume)
+		}
+	}
+	return identities, nil
+}
+
+func dockerVolumeIsBindBacked(driverName string, options map[string]string) bool {
+	if driverName != "local" {
+		return false
+	}
+	for _, option := range strings.Split(options["o"], ",") {
+		option = strings.TrimSpace(option)
+		if strings.EqualFold(option, "bind") || strings.EqualFold(option, "rbind") {
+			return true
+		}
+	}
+	return false
+}
+
+func dockerVolumeIdentity(volume volumetypes.Volume) string {
+	identity, _ := json.Marshal(struct {
+		Name       string            `json:"name"`
+		Driver     string            `json:"driver"`
+		CreatedAt  string            `json:"created_at"`
+		Mountpoint string            `json:"mountpoint"`
+		Options    map[string]string `json:"options"`
+		Labels     map[string]string `json:"labels"`
+	}{
+		Name: volume.Name, Driver: volume.Driver, CreatedAt: volume.CreatedAt,
+		Mountpoint: volume.Mountpoint, Options: volume.Options, Labels: volume.Labels,
+	})
+	digest := sha256.Sum256(identity)
+	return hex.EncodeToString(digest[:])
 }
 
 // Start starts a created workload and its policy proxy, if configured.

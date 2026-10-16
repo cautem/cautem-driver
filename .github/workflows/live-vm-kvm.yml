@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 the cautem authors
+# SPDX-License-Identifier: Apache-2.0
+name: Live VM KVM acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-kvm:
+    name: Linux KVM lifecycle
+    runs-on: [self-hosted, linux, x64, cautem-kvm]
+    timeout-minutes: 20
+    env:
+      CAUTEM_VM_RUNTIME_DIR: ${{ vars.CAUTEM_VM_RUNTIME_DIR }}
+      CAUTEM_VM_BUILD_DIR: ${{ runner.temp }}/cautem-vm-runtime
+    steps:
+      - name: Checkout cautem-driver
+        uses: actions/checkout@v4
+        with:
+          path: cautem-driver
+
+      - name: Checkout cautem-core
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
+
+      - name: Checkout cautem-runtime helpers
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/cautem-runtime
+          path: cautem-runtime
+          ref: 58cca1e35b2b8d7eddc0cbddfefaf6e7172fc215
+
+      - name: Configure Go workspace
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > go.work <<'EOF'
+          go 1.27.0
+
+          use (
+            ./cautem-core
+            ./cautem-driver
+            ./cautem-runtime
+          )
+
+          replace (
+            github.com/cautem/cautem-core v0.1.0-alpha.1 => ./cautem-core
+            github.com/cautem/cautem-core v0.3.0 => ./cautem-core
+          )
+          EOF
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 1.27.2
+          cache: true
+          cache-dependency-path: |
+            cautem-driver/go.sum
+            cautem-core/go.sum
+            cautem-runtime/go.sum
+
+      - name: Verify Linux KVM and run live VM lifecycle
+        working-directory: cautem-driver
+        run: ./scripts/run-live-kvm-acceptance.sh

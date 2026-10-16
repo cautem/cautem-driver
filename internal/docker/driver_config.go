@@ -78,6 +78,21 @@ func parseDockerSandboxDriverConfig(raw string, enableBindMounts bool) ([]string
 	return devices, hasDevices, engineMounts, bindMounts, nil
 }
 
+func validateDriverConfigAllowed(raw string, allowed bool) (bool, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false, nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil || fields == nil {
+		return false, fmt.Errorf("driver_config must be a JSON object")
+	}
+	if len(fields) > 0 && !allowed {
+		return false, fmt.Errorf("caller driver_config is disabled; a gateway administrator must enable allow_driver_config")
+	}
+	return len(fields) > 0, nil
+}
+
 func parseDockerMount(fields map[string]json.RawMessage, enableBindMounts bool) (enginemount.Mount, string, string, error) {
 	var kind string
 	if json.Unmarshal(fields["type"], &kind) != nil {

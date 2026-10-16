@@ -31,3 +31,15 @@ func TestUpstreamProxyEnvIsSidecarScopedAndCredentialFree(t *testing.T) {
 		}
 	}
 }
+
+func TestStopTimeoutPreservesConfiguredZero(t *testing.T) {
+	d := &Driver{runtimeConfig: RuntimeConfig{StopTimeoutSecs: 0, StopTimeoutConfigured: true}}
+	if got := d.stopTimeoutSecs(); got != 0 {
+		t.Fatalf("explicit zero stop timeout became %d seconds", got)
+	}
+
+	d = &Driver{runtimeConfig: RuntimeConfig{StopTimeoutSecs: 15, StopTimeoutConfigured: true}}
+	if got := d.stopTimeoutSecs(); got != 15 {
+		t.Fatalf("configured stop timeout=%d, want 15", got)
+	}
+}

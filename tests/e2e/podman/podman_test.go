@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/driver"
 	podman "github.com/cautem/cautem-driver/internal/podman"
 	"github.com/cautem/cautem-driver/tests/internal/testenv"
@@ -61,7 +62,15 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bindSource, "marker"), []byte("bind-ok"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	engine, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "missing", HealthCheckIntervalSecs: 30, UsernsMode: "host", EnableBindMounts: true})
+	engine, err := podman.NewWithConfig(podman.Config{
+		ImagePullPolicy:         "missing",
+		HealthCheckIntervalSecs: 30,
+		UsernsMode:              "host",
+		EnableBindMounts:        true,
+		AllowDriverConfig:       true,
+		// E2E explicitly exercises caller mounts, including a bind source.
+		ResourceAdmission: &resourceadmission.Config{Enabled: false},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,6 +96,16 @@ func TestPodmanEngineE2E(t *testing.T) {
 	runID := time.Now().UnixNano()
 	name := fmt.Sprintf("podman-e2e-%d", runID)
 	volumeName := fmt.Sprintf("cautem-podman-e2e-cache-%d", runID)
+	if _, err := engineClient.VolumeCreate(ctx, client.VolumeCreateOptions{Name: volumeName}); err != nil {
+		t.Fatalf("create caller volume fixture: %v", err)
+	}
+	defer func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cleanupCancel()
+		if _, err := engineClient.VolumeRemove(cleanupCtx, volumeName, client.VolumeRemoveOptions{Force: true}); err != nil {
+			t.Errorf("remove E2E named volume: %v", err)
+		}
+	}()
 	driverConfig := fmt.Sprintf(`{"mounts":[{"type":"bind","source":%s,"target":"/openshell-bind","read_only":true,"selinux_label":"shared"},{"type":"volume","source":%s,"target":"/openshell-volume","read_only":false},{"type":"tmpfs","target":"/openshell-tmpfs","read_only":false,"size_bytes":4096,"mode":448}]}`, strconv.Quote(bindSource), strconv.Quote(volumeName))
 	h, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
@@ -185,6 +204,9 @@ func TestPodmanEngineE2E(t *testing.T) {
 		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
 			t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
 		}
+		if err := engine.Start(ctx, h.ID); err != nil {
+			t.Fatalf("restart sandbox policy proxy after host-gateway failure probe: %v", err)
+		}
 	}
 	for _, probe := range [][]string{
 		{"probe-connect", probeTarget},
@@ -244,10 +266,6 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	if _, err := engineClient.ContainerInspect(ctx, string(h.ID), client.ContainerInspectOptions{}); err == nil {
 		t.Fatalf("container %s still exists after delete", h.ID)
 	}
-	if _, err := engineClient.VolumeRemove(ctx, volumeName, client.VolumeRemoveOptions{Force: true}); err != nil {
-		t.Errorf("remove E2E named volume: %v", err)
-	}
-
 	// Explicit private ID maps use host IDs and are exercised in the rootful
 	// lane. The rootless lane uses Podman's allocated maps for auto/no-map.
 	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" {
@@ -256,6 +274,8 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 			UsernsMode:              "private",
 			EnableBindMounts:        true,
 			HealthCheckIntervalSecs: 30,
+			AllowDriverConfig:       true,
+			ResourceAdmission:       &resourceadmission.Config{Enabled: false},
 			UIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
 			GIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
 		})

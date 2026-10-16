@@ -2,10 +2,15 @@ package vm
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,6 +19,10 @@ import (
 type SandboxDriverConfig struct {
 	GPUDeviceIDs  *[]string `json:"gpu_device_ids,omitempty"`
 	RootfsTarPath string    `json:"rootfs_tar_path,omitempty"`
+	GRPCEndpoint  string    `json:"grpc_endpoint,omitempty"`
+	GuestTLSCA    string    `json:"guest_tls_ca,omitempty"`
+	GuestTLSCert  string    `json:"guest_tls_cert,omitempty"`
+	GuestTLSKey   string    `json:"guest_tls_key,omitempty"`
 }
 
 // ParseSandboxDriverConfig strictly decodes VM-specific sandbox options.
@@ -47,7 +56,71 @@ func ParseSandboxDriverConfig(raw string) (SandboxDriverConfig, error) {
 			}
 		}
 	}
+	if err := validateVMRelayTLSConfig(config); err != nil {
+		return SandboxDriverConfig{}, err
+	}
 	return config, nil
+}
+
+func validateVMRelayTLSConfig(config SandboxDriverConfig) error {
+	endpoint := strings.TrimSpace(config.GRPCEndpoint)
+	if endpoint != "" {
+		if !strings.Contains(endpoint, "://") {
+			endpoint = "http://" + endpoint
+		}
+		parsed, err := url.Parse(endpoint)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("invalid vm driver_config: grpc_endpoint must be host:port, http://host:port, or https://host:port")
+		}
+	}
+	paths := []string{config.GuestTLSCA, config.GuestTLSCert, config.GuestTLSKey}
+	configured := 0
+	for _, path := range paths {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		configured++
+		if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+			return fmt.Errorf("invalid vm driver_config: guest TLS paths must be absolute and clean")
+		}
+	}
+	if configured != 0 && configured != len(paths) {
+		return fmt.Errorf("invalid vm driver_config: guest_tls_ca, guest_tls_cert and guest_tls_key must be configured together")
+	}
+	if endpoint != "" {
+		parsed, _ := url.Parse(endpoint)
+		if parsed.Scheme == "https" && configured != len(paths) {
+			return fmt.Errorf("invalid vm driver_config: HTTPS grpc_endpoint requires guest TLS CA, certificate and key")
+		}
+		if parsed.Scheme == "http" && configured != 0 {
+			return fmt.Errorf("invalid vm driver_config: guest TLS materials require an HTTPS grpc_endpoint")
+		}
+	}
+	if configured == 0 {
+		return nil
+	}
+	contents := make([][]byte, len(paths))
+	for i, path := range paths {
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() <= 0 || info.Size() > 1<<20 {
+			return fmt.Errorf("invalid vm driver_config: guest TLS files must be regular files no larger than 1 MiB")
+		}
+		if i == 2 && info.Mode().Perm()&0o077 != 0 {
+			return fmt.Errorf("invalid vm driver_config: guest_tls_key must not be accessible by group or others")
+		}
+		contents[i], err = os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("invalid vm driver_config: guest TLS files must be readable")
+		}
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(contents[0]) {
+		return fmt.Errorf("invalid vm driver_config: guest_tls_ca contains no certificates")
+	}
+	if _, err := tls.X509KeyPair(contents[1], contents[2]); err != nil {
+		return fmt.Errorf("invalid vm driver_config: guest TLS client certificate/key pair is invalid")
+	}
+	return nil
 }
 
 func validateSandboxName(name string) error {

@@ -44,7 +44,7 @@ func TestSameOwnedGenerationResourceAcceptsEmptySecretDataOmission(t *testing.T)
 	}
 }
 
-func TestOpenShellDynamicClientDiscoversAlphaAfterBetaNotFound(t *testing.T) {
+func TestCompatDynamicClientDiscoversAlphaAfterBetaNotFound(t *testing.T) {
 	fake := newFakeAgentSandboxDynamicClient()
 	gvr := agentSandboxGVR(sandboxAPIVersionV1Beta1)
 	fake.PrependReactor("list", "sandboxes", func(action k8stesting.Action) (bool, runtime.Object, error) {
@@ -81,7 +81,7 @@ func TestOpenShellDynamicClientDiscoversAlphaAfterBetaNotFound(t *testing.T) {
 	}
 }
 
-func TestOpenShellDynamicClientListAndWatchUseAgentSandboxResourceVersion(t *testing.T) {
+func TestCompatDynamicClientListAndWatchUseAgentSandboxResourceVersion(t *testing.T) {
 	fake := newFakeAgentSandboxDynamicClient()
 	fake.PrependWatchReactor("sandboxes", func(action k8stesting.Action) (bool, watch.Interface, error) {
 		return true, watch.NewFake(), nil
@@ -118,7 +118,7 @@ func TestOpenShellDynamicClientListAndWatchUseAgentSandboxResourceVersion(t *tes
 	}
 }
 
-func TestOpenShellDynamicClientRetriesResourceVersionConflict(t *testing.T) {
+func TestCompatDynamicClientRetriesResourceVersionConflict(t *testing.T) {
 	fake := newFakeAgentSandboxDynamicClient()
 	resource := fake.Resource(agentSandboxGVR(sandboxAPIVersionV1Beta1)).Namespace("openshell")
 	_, err := resource.Create(context.Background(), sandboxObject("40"), metav1.CreateOptions{})
@@ -196,7 +196,7 @@ func TestOpenShellDynamicClientRetriesResourceVersionConflict(t *testing.T) {
 	}
 }
 
-func TestOpenShellDynamicClientStopsConflictRetryOnCancellation(t *testing.T) {
+func TestCompatDynamicClientStopsConflictRetryOnCancellation(t *testing.T) {
 	fake := newFakeAgentSandboxDynamicClient()
 	ctx, cancel := context.WithCancel(context.Background())
 	getCount := 0

@@ -3,6 +3,7 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -60,6 +61,18 @@ func newWithClient(client dynamic.Interface, gatewayID string) *Driver {
 func (d *Driver) Create(ctx context.Context, spec driver.Spec) (driver.Handle, error) {
 	return d.create(ctx, spec)
 }
+
+// ValidateSpec rejects runtime controls that this backend cannot represent.
+func (d *Driver) ValidateSpec(spec driver.Spec) error {
+	if spec.PidsLimit != 0 {
+		return fmt.Errorf("kubernetes compute driver does not support the Quarshell pids limit")
+	}
+	if len(spec.CDIDevices) > 0 {
+		return fmt.Errorf("kubernetes compute driver does not support host CDI device IDs")
+	}
+	return nil
+}
+
 func (d *Driver) Start(ctx context.Context, id core.ID) error { return d.start(ctx, id) }
 func (d *Driver) StartWithToken(ctx context.Context, id core.ID, token string) error {
 	return d.startWithToken(ctx, id, token)

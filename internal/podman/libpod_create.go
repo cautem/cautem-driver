@@ -61,32 +61,42 @@ type nativePortMapping struct {
 	Protocol      string `json:"protocol,omitempty"`
 }
 
+type nativeLogConfiguration struct {
+	Driver  string            `json:"driver,omitempty"`
+	Path    string            `json:"path,omitempty"`
+	Size    int64             `json:"size,omitempty"`
+	Labels  map[string]string `json:"labels,omitempty"`
+	Options map[string]string `json:"options,omitempty"`
+}
+
 type nativeSpec struct {
-	Image           string                  `json:"image"`
-	Name            string                  `json:"name,omitempty"`
-	Env             map[string]string       `json:"env,omitempty"`
-	Labels          map[string]string       `json:"labels,omitempty"`
-	Entrypoint      []string                `json:"entrypoint,omitempty"`
-	Command         []string                `json:"command,omitempty"`
-	User            string                  `json:"user,omitempty"`
-	WorkDir         string                  `json:"work_dir,omitempty"`
-	Terminal        bool                    `json:"terminal,omitempty"`
-	Stdin           bool                    `json:"stdin,omitempty"`
-	UserNS          map[string]string       `json:"userns,omitempty"`
-	IDMappings      *nativeIDMappings       `json:"idmappings,omitempty"`
-	Mounts          []nativeMount           `json:"mounts,omitempty"`
-	Volumes         []nativeVolume          `json:"volumes,omitempty"`
-	Devices         []nativeDevice          `json:"devices,omitempty"`
-	HostAdd         []string                `json:"hostadd,omitempty"`
-	CapDrop         []string                `json:"cap_drop,omitempty"`
-	CapAdd          []string                `json:"cap_add,omitempty"`
-	NoNewPrivileges bool                    `json:"no_new_privileges,omitempty"`
-	Network         map[string]string       `json:"netns,omitempty"`
-	Networks        map[string]any          `json:"networks,omitempty"`
-	Healthcheck     *container.HealthConfig `json:"healthconfig,omitempty"`
-	Resources       map[string]any          `json:"resource_limits,omitempty"`
-	PortMappings    []nativePortMapping     `json:"portmappings,omitempty"`
-	ShmSize         *int64                  `json:"shm_size,omitempty"`
+	Image            string                  `json:"image"`
+	Name             string                  `json:"name,omitempty"`
+	Env              map[string]string       `json:"env,omitempty"`
+	Labels           map[string]string       `json:"labels,omitempty"`
+	Entrypoint       []string                `json:"entrypoint,omitempty"`
+	Command          []string                `json:"command,omitempty"`
+	User             string                  `json:"user,omitempty"`
+	WorkDir          string                  `json:"work_dir,omitempty"`
+	Terminal         bool                    `json:"terminal,omitempty"`
+	Stdin            bool                    `json:"stdin,omitempty"`
+	UserNS           map[string]string       `json:"userns,omitempty"`
+	IDMappings       *nativeIDMappings       `json:"idmappings,omitempty"`
+	Mounts           []nativeMount           `json:"mounts,omitempty"`
+	Volumes          []nativeVolume          `json:"volumes,omitempty"`
+	Devices          []nativeDevice          `json:"devices,omitempty"`
+	HostAdd          []string                `json:"hostadd,omitempty"`
+	CapDrop          []string                `json:"cap_drop,omitempty"`
+	CapAdd           []string                `json:"cap_add,omitempty"`
+	NoNewPrivileges  bool                    `json:"no_new_privileges,omitempty"`
+	ApparmorProfile  string                  `json:"apparmor_profile,omitempty"`
+	Network          map[string]string       `json:"netns,omitempty"`
+	Networks         map[string]any          `json:"networks,omitempty"`
+	Healthcheck      *container.HealthConfig `json:"healthconfig,omitempty"`
+	LogConfiguration *nativeLogConfiguration `json:"log_configuration,omitempty"`
+	Resources        map[string]any          `json:"resource_limits,omitempty"`
+	PortMappings     []nativePortMapping     `json:"portmappings,omitempty"`
+	ShmSize          *int64                  `json:"shm_size,omitempty"`
 }
 
 func nativeCreate(host, usernsMode string, uidMap, gidMap []IDMapping) func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
@@ -251,14 +261,25 @@ func buildNativeSpec(options client.ContainerCreateOptions, usernsMode string, u
 		env[key] = value
 	}
 	noNewPrivileges := false
+	appArmorProfile := ""
 	for _, option := range host.SecurityOpt {
 		if option == "no-new-privileges:true" {
 			noNewPrivileges = true
 			continue
 		}
+		if strings.HasPrefix(option, "apparmor=") {
+			if appArmorProfile != "" || strings.TrimPrefix(option, "apparmor=") == "" {
+				return nativeSpec{}, fmt.Errorf("podman Libpod ID-map create received an invalid or duplicate AppArmor option")
+			}
+			appArmorProfile = strings.TrimPrefix(option, "apparmor=")
+			continue
+		}
 		return nativeSpec{}, fmt.Errorf("podman Libpod ID-map create cannot translate security option %q", option)
 	}
-	spec := nativeSpec{Image: cfg.Image, Name: options.Name, Env: env, Labels: cfg.Labels, Entrypoint: cfg.Entrypoint, Command: cfg.Cmd, User: cfg.User, WorkDir: cfg.WorkingDir, Terminal: cfg.Tty, Stdin: cfg.OpenStdin, HostAdd: host.ExtraHosts, CapDrop: host.CapDrop, CapAdd: host.CapAdd, NoNewPrivileges: noNewPrivileges, Network: map[string]string{"nsmode": string(host.NetworkMode)}, Healthcheck: cfg.Healthcheck, Devices: devices}
+	spec := nativeSpec{Image: cfg.Image, Name: options.Name, Env: env, Labels: cfg.Labels, Entrypoint: cfg.Entrypoint, Command: cfg.Cmd, User: cfg.User, WorkDir: cfg.WorkingDir, Terminal: cfg.Tty, Stdin: cfg.OpenStdin, HostAdd: host.ExtraHosts, CapDrop: host.CapDrop, CapAdd: host.CapAdd, NoNewPrivileges: noNewPrivileges, ApparmorProfile: appArmorProfile, Network: map[string]string{"nsmode": string(host.NetworkMode)}, Healthcheck: cfg.Healthcheck, Devices: devices}
+	if host.LogConfig.Type != "" {
+		spec.LogConfiguration = &nativeLogConfiguration{Driver: host.LogConfig.Type, Options: host.LogConfig.Config}
+	}
 	if host.ShmSize > 0 {
 		size := host.ShmSize
 		spec.ShmSize = &size

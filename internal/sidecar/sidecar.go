@@ -129,6 +129,11 @@ func EnsureLinuxAgent(ctx context.Context, runtimeModuleDir string) (string, err
 	return ensureLinuxCmd(ctx, runtimeModuleDir, "cautem-agent", "./cmd/cautem-agent")
 }
 
+// EnsureLinuxSupervisor builds the Linux PID 1 workload supervisor.
+func EnsureLinuxSupervisor(ctx context.Context, runtimeModuleDir string) (string, error) {
+	return ensureLinuxCmd(ctx, runtimeModuleDir, "cautem-supervisor", "./cmd/cautem-supervisor")
+}
+
 func ensureLinuxCmd(ctx context.Context, runtimeModuleDir, name, pkg string) (string, error) {
 	cacheDir, err := os.UserCacheDir()
 	if err != nil {

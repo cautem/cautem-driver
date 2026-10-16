@@ -19,6 +19,7 @@ import (
 	"time"
 
 	core "github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/driver"
 	"github.com/moby/moby/client"
 )
@@ -156,6 +157,46 @@ func TestSplitSDKLogsAndArchiveEngineContract(t *testing.T) {
 	}
 }
 
+func TestLogsWithOptionsAppliesTailSinceAndProxySource(t *testing.T) {
+	var logRequests int
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1.41/containers/container-id/json":
+			_, _ = io.WriteString(w, `{"Config":{"Labels":{"cautem.name":"demo"}},"Name":"/cautem-demo"}`)
+		case "/v1.41/containers/cautem-proxy-demo/json":
+			_, _ = io.WriteString(w, `{"Config":{"Labels":{}},"Name":"/cautem-proxy-demo"}`)
+		case "/v1.41/containers/cautem-proxy-demo/logs":
+			logRequests++
+			if r.URL.Query().Get("tail") != "37" || r.URL.Query().Get("since") != "1792022400" || r.URL.Query().Get("follow") != "1" {
+				t.Errorf("log query=%s", r.URL.RawQuery)
+			}
+			if r.URL.Query().Get("stdout") != "1" || r.URL.Query().Get("stderr") != "1" {
+				t.Errorf("log stream selectors=%s", r.URL.RawQuery)
+			}
+			var header [8]byte
+			frame := "event\n"
+			header[0] = 1
+			binary.BigEndian.PutUint32(header[4:], uint32(len(frame)))
+			_, _ = w.Write(header[:])
+			_, _ = io.WriteString(w, frame)
+		default:
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	var output strings.Builder
+	err := d.LogsWithOptions(context.Background(), core.ID("container-id"), driver.LogOptions{
+		Follow: true, Tail: 37, TailSet: true, Since: "2026-10-15T00:00:00Z", Source: "proxy",
+	}, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if logRequests != 1 || output.String() != "event\n" {
+		t.Fatalf("log requests=%d output=%q", logRequests, output.String())
+	}
+}
+
 func TestEnsureNetworkRejectsExistingNonInternalProxyNetwork(t *testing.T) {
 	var createRequests int
 	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
@@ -193,14 +234,83 @@ func TestEnsureNetworkReusesInternalProxyNetwork(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"Id":"internal-network","Internal":true,"Labels":{"cautem.sandbox":"1","cautem.name":"safe"},"Options":{"com.docker.network.bridge.gateway_mode_ipv4":"isolated","com.docker.network.bridge.gateway_mode_ipv6":"isolated"}}`)
+		_, _ = io.WriteString(w, `{"Id":"internal-network","Internal":true,"EnableIPv6":true,"Labels":{"cautem.sandbox":"1","cautem.name":"safe"},"Options":{"com.docker.network.bridge.gateway_mode_ipv4":"isolated","com.docker.network.bridge.gateway_mode_ipv6":"isolated"}}`)
 	})
+	d.runtimeConfig.BackendID = "docker"
 	created, err := d.ensureNetwork(context.Background(), "proxy-sandbox-safe", "safe", true)
 	if err != nil {
 		t.Fatalf("reuse internal network: %v", err)
 	}
 	if created {
 		t.Fatal("existing internal network reported as newly created")
+	}
+}
+
+func TestEnsureNetworkRejectsOwnedInternalNetworkWithoutIPv6(t *testing.T) {
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/networks/proxy-sandbox-no-ipv6") || r.Method != http.MethodGet {
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"Id":"owned-network","Name":"proxy-sandbox-no-ipv6","Internal":true,"Labels":{"cautem.sandbox":"1","cautem.name":"no-ipv6","cautem.role":"network"},"Options":{"com.docker.network.bridge.gateway_mode_ipv4":"isolated","com.docker.network.bridge.gateway_mode_ipv6":"isolated"}}`)
+	})
+	d.runtimeConfig.BackendID = "docker"
+	if _, err := d.ensureNetwork(context.Background(), "proxy-sandbox-no-ipv6", "no-ipv6", true); err == nil || !strings.Contains(err.Error(), "does not enable IPv6") {
+		t.Fatalf("reuse of IPv6-disabled internal network error = %v, want fail-closed IPv6 error", err)
+	}
+}
+
+func TestEnsureNetworkCreatesDualStackIsolatedProxyNetwork(t *testing.T) {
+	var createRequests int
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/networks/proxy-sandbox-dual-stack") && r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"not found"}`)
+		case strings.HasSuffix(r.URL.Path, "/networks/create") && r.Method == http.MethodPost:
+			createRequests++
+			var request struct {
+				Driver     string            `json:"Driver"`
+				Internal   bool              `json:"Internal"`
+				EnableIPv6 *bool             `json:"EnableIPv6"`
+				Options    map[string]string `json:"Options"`
+				Labels     map[string]string `json:"Labels"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatalf("decode network create request: %v", err)
+			}
+			if request.Driver != "bridge" || !request.Internal {
+				t.Fatalf("proxy network driver/internal = %q/%t", request.Driver, request.Internal)
+			}
+			if request.EnableIPv6 == nil || !*request.EnableIPv6 {
+				t.Errorf("proxy network EnableIPv6 = %v, want true", request.EnableIPv6)
+			}
+			for _, family := range []string{"ipv4", "ipv6"} {
+				key := "com.docker.network.bridge.gateway_mode_" + family
+				if request.Options[key] != "isolated" {
+					t.Errorf("proxy network option %s = %q, want isolated", key, request.Options[key])
+				}
+			}
+			if request.Labels[labelSandbox] != "1" || request.Labels[labelName] != "dual-stack" || request.Labels[labelRole] != roleNetwork {
+				t.Errorf("proxy network ownership labels = %v", request.Labels)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(w, `{"Id":"created-network"}`)
+		default:
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	d.runtimeConfig.BackendID = "docker"
+
+	created, err := d.ensureNetwork(context.Background(), "proxy-sandbox-dual-stack", "dual-stack", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !created || createRequests != 1 {
+		t.Fatalf("network created=%t create requests=%d", created, createRequests)
 	}
 }
 
@@ -325,6 +435,8 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 			_, _ = io.WriteString(w, `[]`)
 		case strings.Contains(r.URL.Path, "/images/"):
 			_, _ = io.WriteString(w, `{"Id":"sha256:immutable-image-id","Config":{"User":"app:staff"}}`)
+		case r.URL.Path == "/v1.41/volumes/cache" && r.Method == http.MethodGet:
+			_, _ = io.WriteString(w, `{"Name":"cache","Driver":"local","Labels":{},"Options":{}}`)
 		case strings.Contains(r.URL.Path, "/networks/"):
 			_, _ = io.WriteString(w, `{"Id":"network-id","Labels":{"cautem.sandbox":"1","cautem.name":"sdk-fixture"}}`)
 		case r.URL.Path == "/v1.41/containers/create":
@@ -344,6 +456,9 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 		}
 	})
 	d.runtimeConfig.HealthCheckIntervalSecs = 30
+	d.runtimeConfig.AppArmorProfile = AppArmorUnconfined
+	d.runtimeConfig.AllowDriverConfig = true
+	d.runtimeConfig.ResourceAdmission = &resourceadmission.Config{Enabled: false}
 	d.runtimeConfig.UsernsMode = "private"
 	d.runtimeConfig.SandboxNamespace = "openshell-test"
 	d.runtimeConfig.DefaultCPU = 1.5
@@ -420,7 +535,7 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 		t.Fatalf("container identity environment=%v; want trusted OCI USER and no injected sandbox IDs", config.Env)
 	}
 	bindings := host.PortBindings["8080/tcp"]
-	if len(bindings) != 1 || bindings[0].HostIP != "127.0.0.1" || bindings[0].HostPort != "18080" || len(host.SecurityOpt) != 1 || host.SecurityOpt[0] != "no-new-privileges:true" || len(host.CapDrop) != 1 || host.CapDrop[0] != "CAP_NET_RAW" {
+	if len(bindings) != 1 || bindings[0].HostIP != "127.0.0.1" || bindings[0].HostPort != "18080" || !slices.Equal(host.SecurityOpt, []string{"no-new-privileges:true", "apparmor=unconfined"}) || len(host.CapDrop) != 1 || host.CapDrop[0] != "CAP_NET_RAW" {
 		t.Fatalf("container security/loopback publish contract changed: %+v", host)
 	}
 	if len(host.DeviceRequests) != 1 || host.DeviceRequests[0].Driver != "cdi" || len(host.DeviceRequests[0].DeviceIDs) != 1 || host.DeviceRequests[0].DeviceIDs[0] != "nvidia.com/gpu=7" {
@@ -439,6 +554,40 @@ func TestSplitSDKCreateAndInspectEngineContract(t *testing.T) {
 	ip, err := d.ContainerIP(ctx, "container-id", "")
 	if err != nil || ip != "172.18.0.2" {
 		t.Fatalf("container IP=%q err=%v", ip, err)
+	}
+}
+
+func TestContainerIPDoesNotFallBackToAnotherNetwork(t *testing.T) {
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1.41/containers/container-id/json" {
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, `{"NetworkSettings":{"Networks":{"bridge":{"IPAddress":"172.18.0.2"}}}}`)
+	})
+	if ip, err := d.ContainerIP(context.Background(), "container-id", "cautem-net-fixture"); err == nil || ip != "" {
+		t.Fatalf("container IP=%q err=%v; must fail closed when requested network has no IP", ip, err)
+	}
+}
+
+func TestStaticPodmanProxyIPUsesReservedAddressAfterGateway(t *testing.T) {
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1.41/networks/cautem-net-fixture" {
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"Id":"network-id","Name":"cautem-net-fixture","IPAM":{"Driver":"bridge","Config":[{"Subnet":"172.27.1.0/24","Gateway":"172.27.1.1"}]}}`)
+	})
+	ip, err := d.staticPodmanProxyIP(context.Background(), "cautem-net-fixture")
+	if err != nil || ip.String() != "172.27.1.2" {
+		t.Fatalf("static Podman proxy IP=%q err=%v; want first host address after gateway", ip, err)
+	}
+	proxyIP, sandboxIP, err := d.staticPodmanNetworkIPs(context.Background(), "cautem-net-fixture")
+	if err != nil || proxyIP.String() != "172.27.1.2" || sandboxIP.String() != "172.27.1.3" {
+		t.Fatalf("static Podman network IPs=(%q, %q) err=%v; want proxy .2 and sandbox .3", proxyIP, sandboxIP, err)
 	}
 }
 
@@ -479,7 +628,7 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 	_, err := d.Create(context.Background(), driver.Spec{
 		Name: "go-supervisor", Image: "sandbox:local", Workspace: t.TempDir(),
 		Command: []string{"sleep", "infinity"}, InitBin: makeExecutable("cautem-init"), PolicyPath: policy,
-		SupervisorBin: makeExecutable("cautem-supervisor"),
+		SupervisorBin: makeExecutable("cautem-supervisor"), MainProcessRestartPolicy: "always", TTY: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -488,6 +637,9 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 		Entrypoint []string
 		Cmd        []string
 		User       string
+		Env        []string
+		TTY        bool `json:"Tty"`
+		OpenStdin  bool
 	}
 	var host struct{ Binds []string }
 	if err := json.Unmarshal(created["HostConfig"], &host); err != nil {
@@ -503,9 +655,15 @@ func TestCreateRunsGoSupervisorAroundHardenedInit(t *testing.T) {
 	if len(config.Entrypoint) != 1 || config.Entrypoint[0] != "/cautem/cautem-supervisor" || config.User != "0" {
 		t.Fatalf("container entrypoint/user=%v/%q, want Go supervisor PID 1 as root", config.Entrypoint, config.User)
 	}
+	if !config.TTY || !config.OpenStdin {
+		t.Fatalf("TTY sandbox config tty/openStdin=%v/%v, want both enabled", config.TTY, config.OpenStdin)
+	}
 	wantArgs := []string{"--", "/cautem/cautem-init", "--policy", "/cautem/policy.yaml", "--", "sleep", "infinity"}
 	if !slices.Equal(config.Cmd, wantArgs) {
 		t.Fatalf("Go supervisor command=%q, want %q", config.Cmd, wantArgs)
+	}
+	if !containsEnvValue(config.Env, driver.MainProcessRestartPolicyEnv, "always") {
+		t.Fatalf("container env does not carry the selected main process restart policy: %v", config.Env)
 	}
 	for _, want := range []string{"/cautem/cautem-supervisor:ro", "/cautem/cautem-init:ro", "/cautem/policy.yaml:ro"} {
 		found := false
@@ -567,10 +725,15 @@ func TestSplitSDKExecEngineContract(t *testing.T) {
 			}
 			_, _ = buffer.WriteString("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
 			var header [8]byte
-			header[0] = 1
-			binary.BigEndian.PutUint32(header[4:], uint32(len("hello\n")))
-			_, _ = buffer.Write(header[:])
-			_, _ = buffer.WriteString("hello\n")
+			for _, frame := range []struct {
+				stream byte
+				text   string
+			}{{1, "stdout\n"}, {2, "stderr\n"}} {
+				header[0] = frame.stream
+				binary.BigEndian.PutUint32(header[4:], uint32(len(frame.text)))
+				_, _ = buffer.Write(header[:])
+				_, _ = buffer.WriteString(frame.text)
+			}
 			_ = buffer.Flush()
 			// Finish the response stream with a TCP half-close, then drain the
 			// client's close. Closing the socket immediately after Flush can
@@ -588,7 +751,101 @@ func TestSplitSDKExecEngineContract(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
+	stdoutRead, stdoutWrite, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stderrRead, stderrWrite, err := os.Pipe()
+	if err != nil {
+		_ = stdoutRead.Close()
+		_ = stdoutWrite.Close()
+		t.Fatal(err)
+	}
+	previousStdout, previousStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = stdoutWrite, stderrWrite
 	result, err := d.Exec(context.Background(), core.ID("container-id"), driver.ExecRequest{Argv: []string{"echo", "hello"}})
+	os.Stdout, os.Stderr = previousStdout, previousStderr
+	_ = stdoutWrite.Close()
+	_ = stderrWrite.Close()
+	stdout, stdoutErr := io.ReadAll(stdoutRead)
+	stderr, stderrErr := io.ReadAll(stderrRead)
+	_ = stdoutRead.Close()
+	_ = stderrRead.Close()
+	if stdoutErr != nil || stderrErr != nil || string(stdout) != "stdout\n" || string(stderr) != "stderr\n" {
+		t.Fatalf("exec output stdout=%q (%v), stderr=%q (%v)", stdout, stdoutErr, stderr, stderrErr)
+	}
+	if err != nil || result.ExitCode != 0 {
+		t.Fatalf("exec result=%+v err=%v", result, err)
+	}
+}
+
+func TestSplitSDKExecStreamsPipedStdinWithoutTTY(t *testing.T) {
+	const input = "line from a pipe\n"
+	d := sdkFixtureDriver(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1.41/containers/container-id/json":
+			_, _ = io.WriteString(w, `{"Config":{"Env":[],"Labels":{}}}`)
+		case "/v1.41/containers/container-id/exec":
+			var payload struct {
+				AttachStdin bool `json:"AttachStdin"`
+				TTY         bool `json:"Tty"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Error(err)
+			}
+			if !payload.AttachStdin || payload.TTY {
+				t.Errorf("exec stdin/tty flags = %+v; want stdin attached without TTY", payload)
+			}
+			_, _ = io.WriteString(w, `{"Id":"exec-id"}`)
+		case "/v1.41/exec/exec-id/start":
+			connection, buffer, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			_, _ = buffer.WriteString("HTTP/1.1 101 UPGRADED\r\nConnection: Upgrade\r\nUpgrade: tcp\r\n\r\n")
+			if err := buffer.Flush(); err != nil {
+				t.Error(err)
+				_ = connection.Close()
+				return
+			}
+			var startOptions struct {
+				Detach bool `json:"Detach"`
+				TTY    bool `json:"Tty"`
+			}
+			decoder := json.NewDecoder(buffer)
+			if err := decoder.Decode(&startOptions); err != nil {
+				t.Error(err)
+			}
+			if startOptions.Detach || startOptions.TTY {
+				t.Errorf("exec start options=%+v; want attached non-TTY stdin", startOptions)
+			}
+			piped, err := io.ReadAll(io.MultiReader(decoder.Buffered(), buffer))
+			if err != nil || string(piped) != input {
+				t.Errorf("stdin stream=%q err=%v; want %q", piped, err, input)
+			}
+			var header [8]byte
+			header[0] = 1
+			binary.BigEndian.PutUint32(header[4:], uint32(len("received\n")))
+			_, _ = buffer.Write(header[:])
+			_, _ = io.WriteString(buffer, "received\n")
+			_ = buffer.Flush()
+			if halfCloser, ok := connection.(interface{ CloseWrite() error }); ok {
+				_ = halfCloser.CloseWrite()
+				_, _ = io.Copy(io.Discard, buffer)
+			}
+			_ = connection.Close()
+		case "/v1.41/exec/exec-id/json":
+			_, _ = io.WriteString(w, `{"ExitCode":0,"Running":false}`)
+		default:
+			t.Errorf("unexpected engine request: %s %s", r.Method, r.URL)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	result, err := d.Exec(context.Background(), core.ID("container-id"), driver.ExecRequest{
+		Argv:        []string{"cat"},
+		StdinReader: strings.NewReader(input),
+	})
 	if err != nil || result.ExitCode != 0 {
 		t.Fatalf("exec result=%+v err=%v", result, err)
 	}

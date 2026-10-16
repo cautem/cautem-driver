@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/cautem/cautem-core"
 )
@@ -24,13 +25,15 @@ const GatewayIDLabel = "cautem.internal/gateway-id"
 
 // Spec describes a sandbox to create.
 type Spec struct {
-	Name      string   // human name → container cautem-<name>
-	Image     string   // default cautem-sandbox:local (published cautem base)
-	Workspace string   // absolute host path → /workspace
-	GatewayID string   // trusted Gateway installation identity for tenancy boundaries
-	Command   []string // default: sleep infinity
-	Env       []string // KEY=VAL (already allowlisted by caller)
-	IKnow     bool     // override mount deny-list (logged by caller)
+	Name                     string   // human name → container cautem-<name>
+	Image                    string   // default cautem-sandbox:local (published cautem base)
+	Workspace                string   // absolute host path → /workspace
+	GatewayID                string   // trusted Gateway installation identity for tenancy boundaries
+	Command                  []string // default: sleep infinity
+	TTY                      bool     // attach the canonical main process to a container PTY
+	MainProcessRestartPolicy string   // never | on-failure | always; empty defaults to never
+	Env                      []string // KEY=VAL (already allowlisted by caller)
+	IKnow                    bool     // override mount deny-list (logged by caller)
 
 	// Egress sidecar (P3). When ProxyBin is set, network is internal and
 	// a dual-homed cautem-proxy-<name> container is started beside the sandbox.
@@ -89,6 +92,21 @@ type Spec struct {
 	DriverConfigJSON string
 }
 
+const MainProcessRestartPolicyEnv = "CAUTEM_MAIN_PROCESS_RESTART_POLICY"
+
+func NormalizeMainProcessRestartPolicy(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "never":
+		return "never", nil
+	case "on-failure":
+		return "on-failure", nil
+	case "always":
+		return "always", nil
+	default:
+		return "", errors.New("main process restart policy must be never, on-failure, or always")
+	}
+}
+
 // PortPublish maps a host loopback port to a guest container port.
 type PortPublish struct {
 	Host  int
@@ -112,17 +130,46 @@ type Info struct {
 	Status  string
 }
 
-// ExecRequest is a one-shot or PTY-backed command.
+// MainProcessWaiter provides the terminal result for a canonical sandbox
+// process. Drivers that cannot observe its exit code may omit this capability.
+type MainProcessWaiter interface {
+	WaitMainProcess(context.Context, core.ID) (int, error)
+}
+
+// MainProcessLogAttacher opens the canonical process log stream before waiting
+// begins so short-lived workloads cannot exit before the CLI attaches.
+type MainProcessLogAttacher interface {
+	OpenMainProcessLogs(context.Context, core.ID) (io.ReadCloser, error)
+}
+
+// MainProcessTTY provides a bidirectional terminal connection to a TTY-enabled
+// canonical process and resizes the container PTY when the host terminal changes.
+type MainProcessTTY interface {
+	OpenMainProcessTTY(context.Context, core.ID, uint32, uint32) (io.ReadWriteCloser, error)
+	ResizeMainProcessTTY(context.Context, core.ID, uint32, uint32) error
+}
+
+// ExecRequest is a one-shot or PTY-backed command. Stdin is attached for PTY
+// execution by default and for non-PTY execution when explicitly provided.
 type ExecRequest struct {
-	Argv    []string
-	TTY     bool
-	Env     []string
-	WorkDir string // empty → driver default (/workspace)
+	Argv         []string
+	TTY          bool
+	Env          []string
+	WorkDir      string // empty → driver default (/workspace)
+	NoLoginShell bool
+	// Stdin keeps the original one-shot byte input API. StdinReader enables
+	// bounded streaming input for interactive callers without breaking users
+	// built against the previous driver contract.
+	Stdin       []byte
+	StdinReader io.Reader
 }
 
 // ExecResult carries exit status.
 type ExecResult struct {
-	ExitCode int
+	ExitCode        int
+	Stdout          []byte
+	Stderr          []byte
+	OutputTruncated bool
 }
 
 // ComputeDriver is implemented by docker (default), podman, vm, kubernetes.
@@ -141,6 +188,22 @@ type ComputeDriver interface {
 	// EnsureSSHDaemon (re)starts the in-sandbox relay sshd; ErrSSHDisabled when
 	// the sandbox was created without SSH.
 	EnsureSSHDaemon(ctx context.Context, id core.ID) error
+}
+
+// LogOptionsDriver is an optional extension for backends that can apply log
+// selection and tail options. Callers should fall back to ComputeDriver.Logs
+// only when no options beyond follow are needed.
+type LogOptionsDriver interface {
+	LogsWithOptions(ctx context.Context, id core.ID, opts LogOptions, w io.Writer) error
+}
+
+// LogOptions selects the source and bounded tail for container logs.
+type LogOptions struct {
+	Follow  bool
+	Tail    uint32
+	TailSet bool
+	Since   string
+	Source  string // all, sandbox, or proxy
 }
 
 // ProxyReadiness is an optional capability for backends whose proxy is a

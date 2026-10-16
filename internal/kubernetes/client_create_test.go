@@ -18,7 +18,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-func TestOpenShellDynamicCreateBackendAppliesAndReadsBackBothFences(t *testing.T) {
+func TestCompatDynamicCreateBackendAppliesAndReadsBackBothFences(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	fake.PrependReactor("create", "networkpolicies", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		create := action.(k8stesting.CreateAction)
@@ -55,7 +55,7 @@ func TestOpenShellDynamicCreateBackendAppliesAndReadsBackBothFences(t *testing.T
 	}
 }
 
-func TestOpenShellDynamicCreateBackendRefusesMismatchedExistingFence(t *testing.T) {
+func TestCompatDynamicCreateBackendRefusesMismatchedExistingFence(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	workloadFence, supervisorFence, err := renderAgentSandboxRuntimeFence("team-a", "sandbox-a", 5500)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestOpenShellDynamicCreateBackendRefusesMismatchedExistingFence(t *testing.
 	}
 }
 
-func TestOpenShellDynamicCreateBackendRejectsMutatedSupervisorOnSuccessfulCreate(t *testing.T) {
+func TestCompatDynamicCreateBackendRejectsMutatedSupervisorOnSuccessfulCreate(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	params := testAgentSandboxRuntimeRenderParams()
 	resources, err := renderAgentSandboxRuntimeResources(params)
@@ -99,7 +99,7 @@ func TestOpenShellDynamicCreateBackendRejectsMutatedSupervisorOnSuccessfulCreate
 	}
 }
 
-func TestOpenShellDynamicCreateBackendCreatesSuspendedAgentSandbox(t *testing.T) {
+func TestCompatDynamicCreateBackendCreatesSuspendedAgentSandbox(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	fake.PrependReactor("create", "sandboxes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		create := action.(k8stesting.CreateAction)
@@ -126,7 +126,7 @@ func TestOpenShellDynamicCreateBackendCreatesSuspendedAgentSandbox(t *testing.T)
 	}
 }
 
-func TestOpenShellDynamicCreateBackendReportsMutatedSandboxTemplate(t *testing.T) {
+func TestCompatDynamicCreateBackendReportsMutatedSandboxTemplate(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	fake.PrependReactor("create", "sandboxes", func(action k8stesting.Action) (bool, runtime.Object, error) {
 		object := action.(k8stesting.CreateAction).GetObject().(*unstructured.Unstructured).DeepCopy()
@@ -149,7 +149,7 @@ func TestOpenShellDynamicCreateBackendReportsMutatedSandboxTemplate(t *testing.T
 	}
 }
 
-func TestOpenShellDynamicCreateBackendPatchesOperatingStateWithUIDAndResourceVersion(t *testing.T) {
+func TestCompatDynamicCreateBackendPatchesOperatingStateWithUIDAndResourceVersion(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	seedSandboxObject(t, fake, "sandbox-a", "sandbox-uid-a", "rv-42", sandboxAPIVersionV1Beta1)
 	var observedPatch map[string]any
@@ -170,7 +170,7 @@ func TestOpenShellDynamicCreateBackendPatchesOperatingStateWithUIDAndResourceVer
 	}
 }
 
-func TestOpenShellDynamicCreateBackendRereadsResourceVersionAfterConflict(t *testing.T) {
+func TestCompatDynamicCreateBackendRereadsResourceVersionAfterConflict(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	seedSandboxObject(t, fake, "sandbox-a", "sandbox-uid-a", "rv-42", sandboxAPIVersionV1Beta1)
 	var observedVersions []string
@@ -204,7 +204,7 @@ func TestOpenShellDynamicCreateBackendRereadsResourceVersionAfterConflict(t *tes
 	}
 }
 
-func TestOpenShellDynamicCreateBackendRefusesUIDChangedBeforePatch(t *testing.T) {
+func TestCompatDynamicCreateBackendRefusesUIDChangedBeforePatch(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	seedSandboxObject(t, fake, "sandbox-a", "replacement-uid", "rv-42", sandboxAPIVersionV1Beta1)
 	err := newDynamicAgentSandboxCreateBackend(fake).ActivateSandboxController(context.Background(), "team-a", sandboxAPIVersionV1Beta1, "sandbox-a", "original-uid")
@@ -218,7 +218,7 @@ func TestOpenShellDynamicCreateBackendRefusesUIDChangedBeforePatch(t *testing.T)
 	}
 }
 
-func TestOpenShellDynamicCreateBackendReleasesPodGateWithResourceVersion(t *testing.T) {
+func TestCompatDynamicCreateBackendReleasesPodGateWithResourceVersion(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	pod := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "Pod",
@@ -241,7 +241,7 @@ func TestOpenShellDynamicCreateBackendReleasesPodGateWithResourceVersion(t *test
 	}
 }
 
-func TestOpenShellDynamicCreateBackendDeleteUsesUIDPrecondition(t *testing.T) {
+func TestCompatDynamicCreateBackendDeleteUsesUIDPrecondition(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	seedSandboxObject(t, fake, "sandbox-a", "sandbox-uid-a", "rv-42", sandboxAPIVersionV1Beta1)
 	var precondition types.UID
@@ -260,7 +260,7 @@ func TestOpenShellDynamicCreateBackendDeleteUsesUIDPrecondition(t *testing.T) {
 	}
 }
 
-func TestOpenShellDynamicCreateBackendDoesNotDeleteReplacementSandbox(t *testing.T) {
+func TestCompatDynamicCreateBackendDoesNotDeleteReplacementSandbox(t *testing.T) {
 	fake := newFakeAgentSandboxCreateDynamicClient()
 	seedSandboxObject(t, fake, "sandbox-a", "replacement-uid", "rv-42", sandboxAPIVersionV1Beta1)
 	err := newDynamicAgentSandboxCreateBackend(fake).DeleteSandbox(context.Background(), "team-a", sandboxAPIGroup+"/"+sandboxAPIVersionV1Beta1, "sandbox-a", "sandbox-uid-a")
@@ -274,7 +274,7 @@ func TestOpenShellDynamicCreateBackendDoesNotDeleteReplacementSandbox(t *testing
 	}
 }
 
-func TestOpenShellDynamicWorkloadObservationMatchesRenderedPodAndRejectsAdmissionChanges(t *testing.T) {
+func TestCompatDynamicWorkloadObservationMatchesRenderedPodAndRejectsAdmissionChanges(t *testing.T) {
 	input := testAgentSandboxCreateSequenceInput()
 	expectedSpec, _, _ := unstructured.NestedMap(input.SandboxResource, "spec", "podTemplate", "spec")
 	labels, _, _ := unstructured.NestedMap(input.SandboxResource, "spec", "podTemplate", "metadata", "labels")

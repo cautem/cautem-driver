@@ -11,11 +11,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/internal/certbundle"
 	docker "github.com/cautem/cautem-driver/internal/docker"
 )
 
-const defaultHealthCheckIntervalSecs int64 = 10
+const (
+	defaultHealthCheckIntervalSecs int64 = 10
+	defaultStopTimeoutSecs         int   = 45
+)
 
 // IDMapping is a Podman user namespace mapping from a container ID range to a
 // host ID range.
@@ -28,24 +32,51 @@ type IDMapping struct {
 // ConfigFromMap decodes supported fields from openshell.drivers.podman. It
 // rejects unknown keys so settings never appear accepted without an effect.
 func ConfigFromMap(values map[string]any) (Config, error) {
-	cfg := Config{HealthCheckIntervalSecs: defaultHealthCheckIntervalSecs}
+	cfg := Config{HealthCheckIntervalSecs: defaultHealthCheckIntervalSecs, StopTimeoutSecs: defaultStopTimeoutSecs}
+	sshSocketPathConfigured := false
+	guestTLSCAConfigured := false
+	guestTLSClientCertConfigured := false
+	guestTLSClientKeyConfigured := false
 	for key, value := range values {
 		var err error
 		switch key {
 		case "socket_path":
 			cfg.SocketPath, err = stringValue(value)
+			if err == nil && cfg.SocketPath == "" {
+				err = fmt.Errorf("socket_path must not be empty when set")
+			}
 		case "default_image":
 			cfg.DefaultImage, err = stringValue(value)
+			if err == nil && cfg.DefaultImage == "" {
+				err = fmt.Errorf("default_image must not be empty when set")
+			}
+		case "app_armor_profile":
+			var profile string
+			profile, err = stringValue(value)
+			if err == nil {
+				cfg.AppArmorProfile, err = docker.ParseAppArmorProfile(profile)
+			}
+		case "allow_driver_config":
+			cfg.AllowDriverConfig, err = boolValue(value)
+		case "resource_admission":
+			var policy resourceadmission.Config
+			policy, err = resourceAdmissionConfig(value)
+			if err == nil {
+				cfg.ResourceAdmission = &policy
+			}
 		case "network_name":
 			cfg.NetworkName, err = stringValue(value)
 		case "host_gateway_ip":
 			cfg.HostGatewayIP, err = stringValue(value)
 		case "guest_tls_ca":
 			cfg.GuestTLSCA, err = stringValue(value)
+			guestTLSCAConfigured = err == nil
 		case "guest_tls_cert":
 			cfg.GuestTLSCert, err = stringValue(value)
+			guestTLSClientCertConfigured = err == nil
 		case "guest_tls_key":
 			cfg.GuestTLSKey, err = stringValue(value)
+			guestTLSClientKeyConfigured = err == nil
 		case "https_proxy":
 			cfg.HTTPSProxy, err = nonEmptyProxyString(value, key)
 		case "no_proxy":
@@ -66,26 +97,52 @@ func ConfigFromMap(values map[string]any) (Config, error) {
 			cfg.ReconcileDataOwnership, err = boolValue(value)
 		case "image_pull_policy":
 			cfg.ImagePullPolicy, err = stringValue(value)
+			if err == nil && cfg.ImagePullPolicy == "" {
+				err = fmt.Errorf("image_pull_policy must not be empty when set")
+			}
 		case "provider_spiffe_workload_api_socket":
 			cfg.ProviderSPIFFEWorkloadAPISocket, err = stringValue(value)
+			if err == nil && cfg.ProviderSPIFFEWorkloadAPISocket == "" {
+				err = fmt.Errorf("provider_spiffe_workload_api_socket must not be empty when set")
+			}
 		case "grpc_endpoint":
 			cfg.GatewayGRPCEndpoint, err = stringValue(value)
-		case "sandbox_ssh_socket_path":
+		case "ssh_socket_path", "sandbox_ssh_socket_path":
+			if sshSocketPathConfigured {
+				return Config{}, fmt.Errorf("podman: set only one of ssh_socket_path and sandbox_ssh_socket_path")
+			}
 			cfg.SandboxSSHSocketPath, err = stringValue(value)
+			if err == nil && cfg.SandboxSSHSocketPath == "" {
+				err = fmt.Errorf("ssh_socket_path must not be empty when set")
+			}
+			sshSocketPathConfigured = true
 		case "cautem_internal_cleanup_manifest_dir":
 			cfg.CleanupManifestDir, err = stringValue(value)
 		case "stop_timeout_secs":
 			cfg.StopTimeoutSecs, err = intValue(value)
+			cfg.StopTimeoutConfigured = err == nil
+			if err == nil && (cfg.StopTimeoutSecs < 0 || int64(cfg.StopTimeoutSecs) > int64(^uint32(0))) {
+				err = fmt.Errorf("stop_timeout_secs must fit in an unsigned 32-bit integer")
+			}
 		case "gateway_port":
 			cfg.GatewayGRPCPort, err = intValue(value)
 		case "sandbox_pids_limit":
 			cfg.PidsLimit, err = int64Value(value)
+			if err == nil && cfg.PidsLimit == 0 {
+				err = fmt.Errorf("sandbox_pids_limit must be positive when set")
+			}
 		case "enable_bind_mounts":
 			cfg.EnableBindMounts, err = boolValue(value)
 		case "health_check_interval_secs":
 			cfg.HealthCheckIntervalSecs, err = int64Value(value)
+			if err == nil && cfg.HealthCheckIntervalSecs == 0 {
+				err = fmt.Errorf("health_check_interval_secs must be positive when set")
+			}
 		case "userns":
 			cfg.UsernsMode, err = stringValue(value)
+			if err == nil && cfg.UsernsMode == "" {
+				err = fmt.Errorf("userns must not be empty when set")
+			}
 		case "uidmap":
 			cfg.UIDMap, err = idMapListValue(key, value)
 		case "gidmap":
@@ -96,6 +153,12 @@ func ConfigFromMap(values map[string]any) (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("podman: invalid config field %q: %w", key, err)
 		}
+	}
+	if guestTLSClientCertConfigured || guestTLSClientKeyConfigured {
+		return Config{}, fmt.Errorf("podman: guest_tls_cert and guest_tls_key are no longer supported; sandboxes authenticate to the gateway with bearer tokens")
+	}
+	if guestTLSCAConfigured && cfg.GuestTLSCA == "" {
+		return Config{}, fmt.Errorf("podman: guest_tls_ca must not be empty when set")
 	}
 	if cfg.HostGatewayIP != "" {
 		if _, err := netip.ParseAddr(cfg.HostGatewayIP); err != nil {
@@ -138,6 +201,43 @@ func ConfigFromMap(values map[string]any) (Config, error) {
 		return Config{}, fmt.Errorf("podman: uidmap and gidmap are only valid with userns=private")
 	}
 	return cfg, nil
+}
+
+func resourceAdmissionConfig(value any) (resourceadmission.Config, error) {
+	fields, ok := value.(map[string]any)
+	if !ok || fields == nil {
+		return resourceadmission.Config{}, fmt.Errorf("expected table")
+	}
+	policy := resourceadmission.Default()
+	for key, raw := range fields {
+		switch key {
+		case "enabled":
+			var ok bool
+			policy.Enabled, ok = raw.(bool)
+			if !ok {
+				return resourceadmission.Config{}, fmt.Errorf("enabled must be boolean")
+			}
+		case "required_labels":
+			labels, ok := raw.(map[string]any)
+			if !ok || labels == nil {
+				return resourceadmission.Config{}, fmt.Errorf("required_labels must be a table")
+			}
+			policy.RequiredLabels = make(map[string]string, len(labels))
+			for label, rawValue := range labels {
+				value, ok := rawValue.(string)
+				if !ok {
+					return resourceadmission.Config{}, fmt.Errorf("required_labels values must be strings")
+				}
+				policy.RequiredLabels[label] = value
+			}
+		default:
+			return resourceadmission.Config{}, fmt.Errorf("unknown field %q", key)
+		}
+	}
+	if err := policy.Validate(); err != nil {
+		return resourceadmission.Config{}, err
+	}
+	return policy, nil
 }
 
 func validateEgressCABundle(path string) error {
@@ -283,18 +383,11 @@ func validateProxyConfig(cfg Config) error {
 }
 
 func validateGuestTLSPaths(ca, cert, key string) error {
-	configured := 0
-	for _, path := range []string{ca, cert, key} {
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
-		configured++
-		if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-			return fmt.Errorf("guest TLS paths must be absolute and clean")
-		}
+	if strings.TrimSpace(cert) != "" || strings.TrimSpace(key) != "" {
+		return fmt.Errorf("guest_tls_cert and guest_tls_key are no longer supported; sandboxes authenticate to the gateway with bearer tokens")
 	}
-	if configured != 0 && configured != 3 {
-		return fmt.Errorf("guest_tls_ca, guest_tls_cert and guest_tls_key must be configured together")
+	if strings.TrimSpace(ca) != "" && (!filepath.IsAbs(ca) || filepath.Clean(ca) != ca) {
+		return fmt.Errorf("guest_tls_ca must be an absolute clean path")
 	}
 	return nil
 }

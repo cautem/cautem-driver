@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestOpenShellAgentSandboxCreateSequenceFencesBeforeCreateAndReleasesLast(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceFencesBeforeCreateAndReleasesLast(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	identity, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
 	if err != nil {
@@ -88,7 +88,7 @@ func TestCautemAgentSandboxCreateSequenceUsesSplitGenerationSecrets(t *testing.T
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceStopsAndRollsBackOnEveryFailure(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceStopsAndRollsBackOnEveryFailure(t *testing.T) {
 	steps := []string{
 		"ensure-workspace-isolation",
 		"apply-and-observe-fence",
@@ -137,7 +137,7 @@ func TestOpenShellAgentSandboxCreateSequenceStopsAndRollsBackOnEveryFailure(t *t
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsChangedWorkloadOwner(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsChangedWorkloadOwner(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.workload.OwnerSandboxUID = "recreated-cr-uid"
 	_, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
@@ -152,7 +152,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsChangedWorkloadOwner(t *testi
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsUnpairedControlService(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsUnpairedControlService(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.controlService.SelectorBoundaryPair = "another-sandbox"
 	_, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
@@ -164,7 +164,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsUnpairedControlService(t *tes
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsAdmittedWorkloadSecurityDowngrade(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsAdmittedWorkloadSecurityDowngrade(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.workload.DropAllCapabilities = false
 	_, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
@@ -176,7 +176,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsAdmittedWorkloadSecurityDowng
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsSupervisorWithWrongTokenAudience(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsSupervisorWithWrongTokenAudience(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.supervisor.ProjectedTokenAudience = "kubernetes.default"
 	_, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
@@ -188,7 +188,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsSupervisorWithWrongTokenAudie
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRequiresObservedFenceBeforeCreate(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRequiresObservedFenceBeforeCreate(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.incompleteFence = true
 	_, err := runAgentSandboxCreateSequence(context.Background(), backend, testAgentSandboxCreateSequenceInput())
@@ -200,7 +200,7 @@ func TestOpenShellAgentSandboxCreateSequenceRequiresObservedFenceBeforeCreate(t 
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsCrossDomainSecretKey(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsCrossDomainSecretKey(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	input := testAgentSandboxCreateSequenceInput()
 	build := input.BuildBootstrapSecrets
@@ -221,7 +221,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsCrossDomainSecretKey(t *testi
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequenceRejectsUnsuspendedResourceBeforeSideEffects(t *testing.T) {
+func TestCompatAgentSandboxCreateSequenceRejectsUnsuspendedResourceBeforeSideEffects(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	input := testAgentSandboxCreateSequenceInput()
 	input.SandboxResource["spec"].(map[string]any)["operatingMode"] = "Running"
@@ -233,7 +233,7 @@ func TestOpenShellAgentSandboxCreateSequenceRejectsUnsuspendedResourceBeforeSide
 	}
 }
 
-func TestOpenShellAgentSandboxCreateSequencePreservesRollbackFailure(t *testing.T) {
+func TestCompatAgentSandboxCreateSequencePreservesRollbackFailure(t *testing.T) {
 	backend := newFakeAgentSandboxCreateBackend()
 	backend.failAt = "create-gated-supervisor"
 	backend.failDelete = true

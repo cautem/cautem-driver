@@ -27,7 +27,7 @@ func lifecycleFixtureDriver(t *testing.T, handler http.HandlerFunc) *Driver {
 }
 
 func sandboxInspectFixture(state string) string {
-	return "{\"Id\":\"sandbox-id\",\"Name\":\"/cautem-fixture\",\"Config\":{\"Labels\":{\"cautem.sandbox\":\"1\",\"cautem.name\":\"fixture\",\"cautem.role\":\"sandbox\",\"cautem.network\":\"cautem-net-fixture\",\"cautem.ca_volume\":\"cautem-ca-fixture\",\"cautem.ssh_volume\":\"cautem-ssh-fixture\"}},\"State\":{\"Status\":\"" + state + "\"}}"
+	return "{\"Id\":\"sandbox-id\",\"Name\":\"/cautem-fixture\",\"Config\":{\"Labels\":{\"cautem.sandbox\":\"1\",\"cautem.name\":\"fixture\",\"cautem.role\":\"sandbox\",\"cautem.network\":\"cautem-net-fixture\",\"cautem.ca_volume\":\"cautem-ca-fixture\",\"cautem.ssh_volume\":\"cautem-ssh-fixture\",\"cautem.internal/workspace\":\"default\",\"cautem.internal/driver-config-used\":\"false\",\"cautem.internal/driver-config-unlabelable\":\"false\",\"cautem.internal/resource-admission-identities\":\"{}\"}},\"State\":{\"Status\":\"" + state + "\"}}"
 }
 
 func proxyInspectFixture(state string) string {

@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [v0.3.0] - 2026-10-16
+
+### Added
+
+- Capture VM non-interactive exec stdout/stderr in `driver.ExecResult` and pass stdin to the guest agent; cancellation still kills the guest process group.
+- Add a fail-closed VM policy/network broker: a per-VM host proxy listens on a private Unix socket, libkrun exposes a guest-initiated vsock mapping with TSI disabled, and the guest agent forces workload HTTP(S) traffic through its loopback endpoint. Broker startup is health-checked and an unexpected proxy exit stops the worker.
+- Extend live MicroVM acceptance to boot the real supervisor/init/SSH helpers, exercise the Cautem policy engine's default-deny response through the guest vsock broker, observe the supervisor control handshake, execute a command through the SSH vsock relay, and verify restart and recovery paths.
+- Start the guest workload through `cautem-supervisor` and hardening init; bridge supervisor lifecycle RPCs over vsock to the host proxy, force Exec through init, and wait for the proxy relay control socket before boot.
+- Add relay-only guest SSH: the host proxy connects through a private UDS/vsock mapping to a guest-agent bridge and `cautem-sshd`; no guest TCP listener is opened.
+- Validate VM Gateway gRPC endpoint and mTLS client files, pass them only to the host proxy, and keep loopback Gateway URLs reachable from a host-owned VM worker.
+- Reject remaining unsupported VM `driver.Spec` capabilities explicitly, including host workspace mounts, PTY/TTY, GPU, display, persistent volumes, and host integration fields.
+- Add an opt-in native MicroVM live acceptance test for boot, exec, file copy, inspect/list/logs, worker recovery, stop/start, and delete.
+- Verify Linux `/dev/kvm` is a character device that answers `KVM_GET_API_VERSION`; add a self-hosted Linux KVM lifecycle acceptance workflow and runner script.
+- Sign the macOS ARM64 VM worker with Hypervisor and library-loading entitlements and scope the dynamic loader path to the configured runtime bundle.
+- Build VM worker and static guest-agent artifacts in a dedicated Linux CI job and verify guest architecture plus static linking.
+
+### Fixed
+
+- Authenticate every guest vsock control request with a per-sandbox 256-bit token; keep it out of durable JSON state and guest workload environment, and reject unauthorized requests before dispatch.
+- Keep VM control sockets below the portable Unix socket path limit and use the relocated worker socket when refreshing sandbox status.
+- Preserve proxy-owned host Unix listeners for guest-initiated vsock mappings; remove stale sockets only for worker-owned host listeners.
+- Create guest init mountpoints before formatting rootfs images and keep guest root/overlay roots traversable by the unprivileged sandbox user.
+- Reject negative, non-finite, or unrepresentable VM CPU and memory limits instead of silently replacing them with defaults or clamping them.
+- Resolve guest copy paths one directory descriptor at a time and refuse symlinks, preventing copy operations from escaping through workload-controlled parent directories.
+- Accept `init_bin` when its complete supervisor/SSH contract is configured; keep incomplete helper combinations rejected before provisioning.
+- Add an optional `LaunchSpecRestorer` contract so durable control planes can restore backend process-local workload argv/environment after driver restart.
+
 ## [v0.2.1] - 2026-10-13
 
 ### Fixed

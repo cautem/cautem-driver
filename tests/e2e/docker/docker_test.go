@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/driver"
 	docker "github.com/cautem/cautem-driver/internal/docker"
 	"github.com/moby/moby/api/types/container"
@@ -62,9 +65,13 @@ func TestDockerEngineE2E(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine := docker.NewFromClientWithRuntimeConfig(cli, docker.RuntimeConfig{
-		ImagePullPolicy:  "missing",
-		NetworkName:      "cautem-docker-driver-e2e",
-		EnableBindMounts: true,
+		ImagePullPolicy:   "missing",
+		NetworkName:       "cautem-docker-driver-e2e",
+		EnableBindMounts:  true,
+		AllowDriverConfig: true,
+		// This lifecycle fixture exercises bind-mount handling. Production
+		// admission-enabled profiles reject bind mounts without label proof.
+		ResourceAdmission: &resourceadmission.Config{Enabled: false},
 	})
 	defer engine.Close()
 	partialName := "docker-partial-failure"
@@ -93,6 +100,9 @@ func TestDockerEngineE2E(t *testing.T) {
 	runID := time.Now().UnixNano()
 	name := fmt.Sprintf("docker-e2e-%d", runID)
 	volumeName := fmt.Sprintf("cautem-docker-e2e-cache-%d", runID)
+	if _, err := cli.VolumeCreate(ctx, client.VolumeCreateOptions{Name: volumeName}); err != nil {
+		t.Fatalf("create caller volume fixture: %v", err)
+	}
 	handle, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
 		Command:  []string{"/bin/sh", "-c", "echo cautem-docker-e2e-ready; sleep 300"},
@@ -184,16 +194,37 @@ func TestDockerEngineE2E(t *testing.T) {
 		t.Fatalf("authenticated upstream proxy CONNECT result=%+v err=%v logs=%q", result, err, logBuf.String())
 	}
 	proxyNetwork, err := cli.NetworkInspect(ctx, "cautem-docker-driver-e2e-"+name, client.NetworkInspectOptions{})
-	if err != nil || !proxyNetwork.Network.Internal || proxyNetwork.Network.Options["com.docker.network.bridge.gateway_mode_ipv4"] != "isolated" || proxyNetwork.Network.Options["com.docker.network.bridge.gateway_mode_ipv6"] != "isolated" {
-		t.Fatalf("actual Docker sandbox network internal=%v options=%v err=%v; want isolated internal gateway", proxyNetwork.Network.Internal, proxyNetwork.Network.Options, err)
+	if err != nil || !proxyNetwork.Network.Internal || !proxyNetwork.Network.EnableIPv6 || proxyNetwork.Network.Options["com.docker.network.bridge.gateway_mode_ipv4"] != "isolated" || proxyNetwork.Network.Options["com.docker.network.bridge.gateway_mode_ipv6"] != "isolated" {
+		t.Fatalf("actual Docker sandbox network internal=%v enableIPv6=%v options=%v err=%v; want isolated dual-stack internal gateway", proxyNetwork.Network.Internal, proxyNetwork.Network.EnableIPv6, proxyNetwork.Network.Options, err)
 	}
-	if len(proxyNetwork.Network.IPAM.Config) == 0 || !proxyNetwork.Network.IPAM.Config[0].Subnet.IsValid() {
-		t.Fatal("isolated network does not report an IPv4 subnet for the direct host reachability probe")
+	var ipv4Subnet, ipv6Subnet netip.Prefix
+	for _, config := range proxyNetwork.Network.IPAM.Config {
+		if !config.Subnet.IsValid() {
+			continue
+		}
+		if config.Subnet.Addr().Is4() {
+			ipv4Subnet = config.Subnet
+		} else if config.Subnet.Addr().Is6() {
+			ipv6Subnet = config.Subnet
+		}
+	}
+	if !ipv4Subnet.IsValid() || !ipv6Subnet.IsValid() {
+		t.Fatalf("isolated dual-stack network IPAM subnets = %v; want IPv4 and IPv6", proxyNetwork.Network.IPAM.Config)
 	}
 	// Isolated mode deliberately has no assigned gateway address; probe the
 	// conventional first subnet address where a bridge gateway would normally sit.
-	hostGatewayTarget, closeHostGateway := startHostGatewayProbeTarget(t, ctx, cli, image, proxyNetwork.Network.IPAM.Config[0].Subnet.Addr().Next().String())
+	hostGatewayTarget, closeHostGateway := startHostGatewayProbeTarget(t, ctx, cli, image, ipv4Subnet.Masked().Addr().Next().String())
 	defer closeHostGateway()
+	containerInfo, err := cli.ContainerInspect(ctx, string(handle.ID), client.ContainerInspectOptions{})
+	if err != nil {
+		t.Fatalf("inspect sandbox network endpoints: %v", err)
+	}
+	endpoint := containerInfo.Container.NetworkSettings.Networks[proxyNetwork.Network.Name]
+	if endpoint == nil || !endpoint.GlobalIPv6Address.IsValid() {
+		t.Fatalf("sandbox IPv6 address on isolated network = %v; want an assigned IPv6 address", endpoint)
+	}
+	hostGatewayIPv6Target, closeHostGatewayIPv6 := startHostGatewayIPv6ProbeTarget(t, ctx, ipv6Subnet, proxyNetwork.Network.ID)
+	defer closeHostGatewayIPv6()
 	proxyInfo, err := cli.ContainerInspect(ctx, "cautem-proxy-"+name, client.ContainerInspectOptions{})
 	if err != nil {
 		t.Fatalf("inspect Docker policy proxy sidecar: %v", err)
@@ -216,6 +247,9 @@ func TestDockerEngineE2E(t *testing.T) {
 	}
 	if result, err := engine.Exec(ctx, handle.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostGatewayTarget}}); err != nil || result.ExitCode != 0 {
 		t.Fatalf("sandbox reached host gateway directly at %s: result=%+v err=%v", hostGatewayTarget, result, err)
+	}
+	if result, err := engine.Exec(ctx, handle.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostGatewayIPv6Target}}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("sandbox reached host IPv6 gateway directly at %s: result=%+v err=%v", hostGatewayIPv6Target, result, err)
 	}
 	info, err := engine.Inspect(ctx, string(handle.ID))
 	if err != nil {
@@ -314,6 +348,79 @@ func startHostGatewayProbeTarget(t *testing.T, ctx context.Context, engine *clie
 	cleanup()
 	t.Fatal("host-network policy-probe listener did not become reachable")
 	return "", func() {}
+}
+
+func startHostGatewayIPv6ProbeTarget(t *testing.T, ctx context.Context, subnet netip.Prefix, networkID string) (string, func()) {
+	t.Helper()
+	if !subnet.IsValid() || !subnet.Addr().Is6() || len(networkID) < 12 {
+		t.Fatalf("invalid IPv6 host-gateway probe inputs: subnet=%v network_id=%q", subnet, networkID)
+	}
+	address := subnet.Masked().Addr().Next()
+	bridge := "br-" + networkID[:12]
+	disableIPv6Path := filepath.Join("/proc/sys/net/ipv6/conf", bridge, "disable_ipv6")
+	disableIPv6, err := os.ReadFile(disableIPv6Path)
+	if err != nil {
+		t.Fatalf("read isolated bridge IPv6 state: %v", err)
+	}
+	restoreDisabled := strings.TrimSpace(string(disableIPv6)) == "1"
+	if restoreDisabled {
+		if err := os.WriteFile(disableIPv6Path, []byte("0"), 0o644); err != nil {
+			t.Fatalf("temporarily enable IPv6 on isolated bridge %s for host-gateway probe: %v", bridge, err)
+		}
+	}
+	prefix := netip.PrefixFrom(address, subnet.Bits()).String()
+	runHostIP(t, ctx, "-6", "addr", "add", prefix, "dev", bridge, "nodad")
+	listener, err := net.Listen("tcp6", net.JoinHostPort(address.String(), "17780"))
+	if err != nil {
+		cleanupHostIPv6ProbeAddress(bridge, prefix, nil)
+		restoreHostBridgeIPv6(t, disableIPv6Path, restoreDisabled)
+		t.Fatalf("listen on isolated bridge IPv6 host address %s: %v", address, err)
+	}
+	cleanup := func() {
+		cleanupHostIPv6ProbeAddress(bridge, prefix, listener)
+		restoreHostBridgeIPv6(t, disableIPv6Path, restoreDisabled)
+	}
+	ready := false
+	defer func() {
+		if !ready {
+			cleanup()
+		}
+	}()
+	probe, err := net.DialTimeout("tcp6", net.JoinHostPort(address.String(), "17780"), time.Second)
+	if err != nil {
+		t.Fatalf("verify IPv6 host-gateway probe listener: %v", err)
+	}
+	_ = probe.Close()
+	ready = true
+	return net.JoinHostPort(address.String(), "17780"), cleanup
+}
+
+func restoreHostBridgeIPv6(t *testing.T, sysctlPath string, restore bool) {
+	t.Helper()
+	if restore {
+		if err := os.WriteFile(sysctlPath, []byte("1"), 0o644); err != nil && !os.IsNotExist(err) {
+			t.Errorf("restore isolated bridge IPv6-disabled state: %v", err)
+		}
+	}
+}
+
+func cleanupHostIPv6ProbeAddress(bridge, prefix string, listener net.Listener) {
+	if listener != nil {
+		_ = listener.Close()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, "ip", "-6", "addr", "del", prefix, "dev", bridge)
+	_, _ = command.CombinedOutput()
+}
+
+func runHostIP(t *testing.T, ctx context.Context, args ...string) {
+	t.Helper()
+	command := exec.CommandContext(ctx, "ip", args...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ip %v: %v: %s", args, err, strings.TrimSpace(string(output)))
+	}
 }
 
 func startUpstreamProxy(t *testing.T, ctx context.Context, engine *client.Client, image string) (string, string) {

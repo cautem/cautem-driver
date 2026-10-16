@@ -51,6 +51,33 @@ func TestParseDockerSandboxDriverConfig(t *testing.T) {
 	}
 }
 
+func TestValidateDriverConfigAllowedUsesOperatorGate(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		input    string
+		allowed  bool
+		wantErr  bool
+		wantUsed bool
+	}{
+		{name: "omitted"},
+		{name: "empty object", input: `{}`},
+		{name: "empty object whitespace", input: `{  }`},
+		{name: "caller config disabled", input: `{"mounts":[]}`, wantErr: true},
+		{name: "caller config enabled", input: `{"mounts":[]}`, allowed: true, wantUsed: true},
+		{name: "non-object", input: `[]`, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			used, err := validateDriverConfigAllowed(test.input, test.allowed)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("validate error=%v wantErr=%t", err, test.wantErr)
+			}
+			if err == nil && used != test.wantUsed {
+				t.Fatalf("configUsed=%t for input %q", used, test.input)
+			}
+		})
+	}
+}
+
 func TestDockerMountValidationSecurityCorpus(t *testing.T) {
 	validBind := t.TempDir()
 	if err := os.WriteFile(filepath.Join(validBind, "marker"), []byte("ok"), 0o600); err != nil {

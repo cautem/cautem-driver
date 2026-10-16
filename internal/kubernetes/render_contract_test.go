@@ -11,7 +11,7 @@ import (
 // and scheduling/resource projection contracts from the pinned OpenShell source:
 // tools/upstream/openshell/crates/openshell-driver-kubernetes/src/driver.rs at
 // 77c5ff6e20c98b3674616ecf35b2464f2b8e57ca.
-func TestOpenShellDriverConfigRendersPVCSubpathMounts(t *testing.T) {
+func TestCompatDriverConfigRendersPVCSubpathMounts(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"volumes": [{
 			"name": "user-data",
@@ -48,7 +48,7 @@ func TestOpenShellDriverConfigRendersPVCSubpathMounts(t *testing.T) {
 	assertJSONEqual(t, got, want)
 }
 
-func TestOpenShellDriverConfigRendersSchedulingAndAgentResources(t *testing.T) {
+func TestCompatDriverConfigRendersSchedulingAndAgentResources(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"pod": {
 			"node_selector": {"pool": "sandbox", "zone": "west"},
@@ -88,7 +88,7 @@ func TestOpenShellDriverConfigRendersSchedulingAndAgentResources(t *testing.T) {
 	assertJSONEqual(t, got, want)
 }
 
-func TestOpenShellDriverConfigSuppressesDefaultWorkspaceForSandboxMount(t *testing.T) {
+func TestCompatDriverConfigSuppressesDefaultWorkspaceForSandboxMount(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"volumes": [{"name": "workspace-data", "persistent_volume_claim": {"claim_name": "pvc-workspace"}}],
 		"containers": {"agent": {"volume_mounts": [

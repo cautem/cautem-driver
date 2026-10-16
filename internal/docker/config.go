@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/internal/certbundle"
 )
 
@@ -17,22 +18,62 @@ import (
 // Engine implementation. Unconsumed OpenShell fields fail closed.
 func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 	cfg := RuntimeConfig{SandboxNamespace: "default"}
+	sandboxNamespaceConfigured := false
+	stopTimeoutConfigured := false
+	proxyAuthAllowInsecureConfigured := false
+	proxyConnectByHostnameConfigured := false
+	guestTLSCAConfigured := false
+	guestTLSClientCertConfigured := false
+	guestTLSClientKeyConfigured := false
 	socket := ""
 	for key, value := range values {
 		var err error
 		switch key {
 		case "socket_path":
 			socket, err = configString(value)
+			if err == nil && socket == "" {
+				err = fmt.Errorf("socket_path must not be empty when set")
+			}
 		case "default_image":
 			cfg.DefaultImage, err = configString(value)
+			if err == nil && cfg.DefaultImage == "" {
+				err = fmt.Errorf("default_image must not be empty when set")
+			}
+		case "app_armor_profile":
+			var profile string
+			profile, err = configString(value)
+			if err == nil {
+				cfg.AppArmorProfile, err = ParseAppArmorProfile(profile)
+			}
+		case "allow_driver_config":
+			cfg.AllowDriverConfig, err = configBool(value)
+		case "resource_admission":
+			var policy resourceadmission.Config
+			policy, err = resourceAdmissionConfig(value)
+			if err == nil {
+				cfg.ResourceAdmission = &policy
+			}
 		case "sandbox_namespace":
+			if sandboxNamespaceConfigured {
+				return RuntimeConfig{}, "", fmt.Errorf("docker: set only one of sandbox_label and sandbox_namespace")
+			}
 			cfg.SandboxNamespace, err = configString(value)
+			sandboxNamespaceConfigured = true
+		case "sandbox_label":
+			if sandboxNamespaceConfigured {
+				return RuntimeConfig{}, "", fmt.Errorf("docker: set only one of sandbox_label and sandbox_namespace")
+			}
+			cfg.SandboxNamespace, err = configString(value)
+			sandboxNamespaceConfigured = true
 		case "guest_tls_ca":
 			cfg.GuestTLSCA, err = configString(value)
+			guestTLSCAConfigured = err == nil
 		case "guest_tls_cert":
 			cfg.GuestTLSCert, err = configString(value)
+			guestTLSClientCertConfigured = err == nil
 		case "guest_tls_key":
 			cfg.GuestTLSKey, err = configString(value)
+			guestTLSClientKeyConfigured = err == nil
 		case "network_name":
 			cfg.NetworkName, err = configString(value)
 		case "host_gateway_ip":
@@ -41,20 +82,36 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 			cfg.GatewayGRPCEndpoint, err = configString(value)
 		case "ssh_socket_path":
 			cfg.SandboxSSHSocketPath, err = configString(value)
+			if err == nil && cfg.SandboxSSHSocketPath == "" {
+				err = fmt.Errorf("ssh_socket_path must not be empty when set")
+			}
 		case "cautem_internal_cleanup_manifest_dir":
 			cfg.CleanupManifestDir, err = configString(value)
 		case "sandbox_pids_limit":
 			cfg.PidsLimit, err = configInt64(value)
+			if err == nil && cfg.PidsLimit == 0 {
+				err = fmt.Errorf("sandbox_pids_limit must be positive when set")
+			}
 		case "stop_timeout_secs":
 			cfg.StopTimeoutSecs, err = configInt(value)
+			stopTimeoutConfigured = err == nil
+			if err == nil && (cfg.StopTimeoutSecs < 0 || uint64(cfg.StopTimeoutSecs) > uint64(^uint32(0))) {
+				err = fmt.Errorf("stop_timeout_secs must fit in an unsigned 32-bit integer")
+			}
 		case "gateway_port":
 			cfg.GatewayGRPCPort, err = configInt(value)
 		case "enable_bind_mounts":
 			cfg.EnableBindMounts, err = configBool(value)
 		case "provider_spiffe_workload_api_socket":
 			cfg.ProviderSPIFFEWorkloadAPISocket, err = configString(value)
+			if err == nil && cfg.ProviderSPIFFEWorkloadAPISocket == "" {
+				err = fmt.Errorf("provider_spiffe_workload_api_socket must not be empty when set")
+			}
 		case "image_pull_policy":
 			cfg.ImagePullPolicy, err = configString(value)
+			if err == nil && cfg.ImagePullPolicy == "" {
+				err = fmt.Errorf("image_pull_policy must not be empty when set")
+			}
 		case "https_proxy":
 			cfg.UpstreamProxyURL, err = nonEmptyProxyString(value, key)
 		case "no_proxy":
@@ -63,8 +120,10 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 			cfg.UpstreamProxyAuthFile, err = nonEmptyProxyString(value, key)
 		case "proxy_auth_allow_insecure":
 			cfg.UpstreamProxyAuthAllowInsecure, err = configBool(value)
+			proxyAuthAllowInsecureConfigured = err == nil
 		case "proxy_connect_by_hostname":
 			cfg.UpstreamProxyConnectByHostname, err = configBool(value)
+			proxyConnectByHostnameConfigured = err == nil
 		case "proxy_ca_bundle":
 			cfg.UpstreamProxyCABundle, err = nonEmptyProxyString(value, key)
 		case "egress_ca_bundle":
@@ -77,6 +136,15 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 		if err != nil {
 			return RuntimeConfig{}, "", fmt.Errorf("docker: invalid config field %q", key)
 		}
+	}
+	cfg.StopTimeoutConfigured = stopTimeoutConfigured
+	cfg.UpstreamProxyAuthAllowInsecureConfigured = proxyAuthAllowInsecureConfigured
+	cfg.UpstreamProxyConnectByHostnameConfigured = proxyConnectByHostnameConfigured
+	if guestTLSClientCertConfigured || guestTLSClientKeyConfigured {
+		return RuntimeConfig{}, "", fmt.Errorf("docker: guest_tls_cert and guest_tls_key are no longer supported; sandboxes authenticate to the gateway with bearer tokens")
+	}
+	if guestTLSCAConfigured && cfg.GuestTLSCA == "" {
+		return RuntimeConfig{}, "", fmt.Errorf("docker: guest_tls_ca must not be empty when set")
 	}
 	if cfg.HostGatewayIP != "" && net.ParseIP(cfg.HostGatewayIP) == nil {
 		return RuntimeConfig{}, "", fmt.Errorf("docker: host_gateway_ip must be an IP address")
@@ -103,11 +171,51 @@ func ConfigFromMap(values map[string]any) (RuntimeConfig, string, error) {
 	if err != nil {
 		return RuntimeConfig{}, "", fmt.Errorf("docker: %w", err)
 	}
+	if policy == "newer" {
+		return RuntimeConfig{}, "", fmt.Errorf("docker: image_pull_policy newer is supported only by Podman")
+	}
 	cfg.ImagePullPolicy = policy
 	if socket != "" && !strings.Contains(socket, "://") {
 		socket = "unix://" + socket
 	}
 	return cfg, socket, nil
+}
+
+func resourceAdmissionConfig(value any) (resourceadmission.Config, error) {
+	fields, ok := value.(map[string]any)
+	if !ok || fields == nil {
+		return resourceadmission.Config{}, fmt.Errorf("expected table")
+	}
+	policy := resourceadmission.Default()
+	for key, raw := range fields {
+		switch key {
+		case "enabled":
+			var ok bool
+			policy.Enabled, ok = raw.(bool)
+			if !ok {
+				return resourceadmission.Config{}, fmt.Errorf("enabled must be boolean")
+			}
+		case "required_labels":
+			labels, ok := raw.(map[string]any)
+			if !ok || labels == nil {
+				return resourceadmission.Config{}, fmt.Errorf("required_labels must be a table")
+			}
+			policy.RequiredLabels = make(map[string]string, len(labels))
+			for label, rawValue := range labels {
+				value, ok := rawValue.(string)
+				if !ok {
+					return resourceadmission.Config{}, fmt.Errorf("required_labels values must be strings")
+				}
+				policy.RequiredLabels[label] = value
+			}
+		default:
+			return resourceadmission.Config{}, fmt.Errorf("unknown field %q", key)
+		}
+	}
+	if err := policy.Validate(); err != nil {
+		return resourceadmission.Config{}, err
+	}
+	return policy, nil
 }
 
 func validateEgressCABundle(path string) error {
@@ -177,10 +285,10 @@ func validateUpstreamProxyConfig(cfg RuntimeConfig) error {
 		if !ok || strings.TrimSpace(username) == "" || password == "" {
 			return fmt.Errorf("proxy_auth_file must contain user:pass")
 		}
-	} else if cfg.UpstreamProxyAuthAllowInsecure {
+	} else if cfg.UpstreamProxyAuthAllowInsecure || cfg.UpstreamProxyAuthAllowInsecureConfigured {
 		return fmt.Errorf("proxy_auth_allow_insecure requires proxy_auth_file")
 	}
-	if cfg.UpstreamProxyConnectByHostname && cfg.UpstreamProxyURL == "" {
+	if (cfg.UpstreamProxyConnectByHostname || cfg.UpstreamProxyConnectByHostnameConfigured) && cfg.UpstreamProxyURL == "" {
 		return fmt.Errorf("proxy_connect_by_hostname requires https_proxy")
 	}
 	if cfg.UpstreamProxyCABundle != "" {
@@ -203,17 +311,11 @@ func validateUpstreamProxyConfig(cfg RuntimeConfig) error {
 }
 
 func validateGuestTLSPaths(ca, cert, key string) error {
-	configured := 0
-	for _, path := range []string{ca, cert, key} {
-		if strings.TrimSpace(path) != "" {
-			configured++
-			if !filepath.IsAbs(path) || filepath.Clean(path) != path {
-				return fmt.Errorf("guest TLS paths must be absolute and clean")
-			}
-		}
+	if strings.TrimSpace(cert) != "" || strings.TrimSpace(key) != "" {
+		return fmt.Errorf("guest_tls_cert and guest_tls_key are no longer supported; sandboxes authenticate to the gateway with bearer tokens")
 	}
-	if configured != 0 && configured != 3 {
-		return fmt.Errorf("guest_tls_ca, guest_tls_cert and guest_tls_key must be configured together")
+	if strings.TrimSpace(ca) != "" && (!filepath.IsAbs(ca) || filepath.Clean(ca) != ca) {
+		return fmt.Errorf("guest_tls_ca must be an absolute clean path")
 	}
 	return nil
 }

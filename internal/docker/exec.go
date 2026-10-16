@@ -2,6 +2,7 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -76,12 +77,22 @@ func (d *Driver) Exec(ctx context.Context, id core.ID, req driver.ExecRequest) (
 		}
 	}
 
+	var stdin io.Reader
+	switch {
+	case req.StdinReader != nil:
+		stdin = req.StdinReader
+	case len(req.Stdin) > 0:
+		stdin = bytes.NewReader(req.Stdin)
+	}
+	if tty && stdin == nil {
+		stdin = os.Stdin
+	}
 	execID, err := d.cli.ExecCreate(ctx, string(id), client.ExecCreateOptions{
 		Cmd:          argv,
 		Env:          env,
 		AttachStdout: true,
 		AttachStderr: true,
-		AttachStdin:  tty,
+		AttachStdin:  stdin != nil,
 		TTY:          tty,
 		WorkingDir:   workdir,
 		ConsoleSize:  consoleSize,
@@ -98,6 +109,21 @@ func (d *Driver) Exec(ctx context.Context, id core.ID, req driver.ExecRequest) (
 	}
 	defer attach.Close()
 	setConnNoDelay(attach.Conn)
+	streamDone := make(chan struct{})
+	defer close(streamDone)
+	go func() {
+		select {
+		case <-ctx.Done():
+			attach.Close()
+		case <-streamDone:
+		}
+	}()
+	if stdin != nil && !tty {
+		go func() {
+			_, _ = io.Copy(attach.Conn, stdin)
+			_ = attach.CloseWrite()
+		}()
+	}
 
 	if tty {
 		if hostTTY {
@@ -119,7 +145,7 @@ func (d *Driver) Exec(ctx context.Context, id core.ID, req driver.ExecRequest) (
 		}()
 		go func() {
 			// Small reads so mouse-wheel CSI sequences are forwarded promptly.
-			_, _ = copyStdinTTY(attach.Conn, os.Stdin)
+			_, _ = copyStdinTTY(attach.Conn, stdin)
 			_ = attach.CloseWrite()
 		}()
 		<-outDone
@@ -250,13 +276,42 @@ func (d *Driver) EnsureSSHDaemon(ctx context.Context, id core.ID) error {
 		case <-time.After(readinessPollInterval):
 		}
 	}
-	return fmt.Errorf("sshd socket %s did not appear (see %s)", sshSocket, defaults.GuestSSHLog)
+	_, sshdLog, logErr := d.rawExecOutput(ctx, string(id), []string{"cat", defaults.GuestSSHLog})
+	if logErr != nil {
+		logs, containerLogErr := d.containerLogText(ctx, string(id))
+		if containerLogErr == nil && strings.TrimSpace(logs) != "" {
+			return fmt.Errorf("sshd socket %s did not appear (guest log read failed: %v); container output: %s", sshSocket, logErr, strings.TrimSpace(logs))
+		}
+		return fmt.Errorf("sshd socket %s did not appear (see %s; log read failed: %v)", sshSocket, defaults.GuestSSHLog, logErr)
+	}
+	if strings.TrimSpace(sshdLog) != "" {
+		return fmt.Errorf("sshd socket %s did not appear: %s", sshSocket, strings.TrimSpace(sshdLog))
+	}
+	return fmt.Errorf("sshd socket %s did not appear (see %s; log is empty)", sshSocket, defaults.GuestSSHLog)
+}
+
+func (d *Driver) containerLogText(ctx context.Context, id string) (string, error) {
+	logs, err := d.cli.ContainerLogs(ctx, id, client.ContainerLogsOptions{ShowStdout: true, ShowStderr: true, Timestamps: false})
+	if err != nil {
+		return "", err
+	}
+	defer logs.Close()
+	var output bytes.Buffer
+	if _, err := stdcopy.StdCopy(&output, &output, logs); err != nil {
+		return output.String(), err
+	}
+	return output.String(), nil
 }
 
 // rawExec runs argv as root without the cautem-init wrapper.
 
 // rawExec runs argv as root without the cautem-init wrapper.
 func (d *Driver) rawExec(ctx context.Context, id string, argv []string) (int, error) {
+	code, _, err := d.rawExecOutput(ctx, id, argv)
+	return code, err
+}
+
+func (d *Driver) rawExecOutput(ctx context.Context, id string, argv []string) (int, string, error) {
 	execID, err := d.cli.ExecCreate(ctx, id, client.ExecCreateOptions{
 		Cmd:          argv,
 		User:         "0",
@@ -265,17 +320,21 @@ func (d *Driver) rawExec(ctx context.Context, id string, argv []string) (int, er
 		WorkingDir:   "/",
 	})
 	if err != nil {
-		return -1, err
+		return -1, "", err
 	}
 	attach, err := d.cli.ExecAttach(ctx, execID.ID, client.ExecAttachOptions{})
 	if err != nil {
-		return -1, err
+		return -1, "", err
 	}
-	_, _ = io.Copy(io.Discard, attach.Reader)
+	var output bytes.Buffer
+	_, copyErr := stdcopy.StdCopy(&output, &output, attach.Reader)
 	attach.Close()
+	if copyErr != nil {
+		return -1, output.String(), copyErr
+	}
 	insp, err := d.cli.ExecInspect(ctx, execID.ID, client.ExecInspectOptions{})
 	if err != nil {
-		return -1, err
+		return -1, output.String(), err
 	}
-	return insp.ExitCode, nil
+	return insp.ExitCode, output.String(), nil
 }
