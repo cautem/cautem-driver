@@ -40,6 +40,10 @@ cleanup() {
 			docker logs "$container_name" >&2 || true
 			docker exec "$container_name" sh -lc 'cat /tmp/podman-policy-service.log 2>/dev/null || true' >&2 || true
 		fi
+		# Podman runs as root or in a user namespace and creates root-owned
+		# files in the host bind. Make the private temp workspace removable by
+		# the runner after the service container exits.
+		docker exec "$container_name" chmod -R u+rwX /cautem-podman-e2e/workspace >/dev/null 2>&1 || true
 		docker rm -f "$container_name" >/dev/null 2>&1 || true
 	fi
 	docker image rm -f "$sandbox_image" "$proxy_image" >/dev/null 2>&1 || true
@@ -138,6 +142,7 @@ else
 	docker exec \
 		-e STORAGE_DRIVER=vfs -e DOCKER_HOST="tcp://127.0.0.1:$container_port" \
 		-e CAUTEM_PODMAN_E2E=1 -e CAUTEM_PODMAN_WORKSPACE=/cautem-podman-e2e/workspace \
+		-e CAUTEM_PODMAN_E2E_DISABLE_PIDS_LIMIT=1 \
 		-e CAUTEM_E2E_SANDBOX_IMAGE="$sandbox_image" -e CAUTEM_PROXY_IMAGE="$proxy_image" \
 		-e CAUTEM_HELPERS_DIR=/cautem-podman-e2e/helpers \
 		"$container_name" /cautem-podman-e2e/podman.test -test.run '^TestPodmanEngineE2E$' -test.count=1 -test.v \

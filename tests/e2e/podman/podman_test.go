@@ -50,6 +50,14 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(policyPath, []byte("version: 1\nnetwork_policies: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	policyPidsLimit := int64(128)
+	if os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_PIDS_LIMIT") == "1" {
+		// Nested Podman service containers on hosted runners may not receive a
+		// delegated pids cgroup controller. Keep this proxy-isolation scenario
+		// focused on networking there. A non-nested acceptance run leaves this
+		// unset and verifies the configured limit as part of this scenario.
+		policyPidsLimit = -1
+	}
 	// The Podman daemon runs in a disposable Docker container; use a host path
 	// shared with that container rather than this test process's temp directory.
 	bindSource := filepath.Join(workspace, "driver-config-bind")
@@ -110,7 +118,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 	h, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
 		Command:  []string{"/bin/sh", "-c", "echo cautem-podman-e2e-ready; sleep 300"},
-		NoHarden: true, PersistVolume: true, CPU: 0.5, MemoryBytes: 256 << 20, PidsLimit: 128,
+		NoHarden: true, PersistVolume: true, CPU: 0.5, MemoryBytes: 256 << 20, PidsLimit: policyPidsLimit,
 		ProxyBin: proxyBin, ProxyImage: proxyImage, PolicyPath: policyPath,
 		DriverConfigJSON: driverConfig,
 	})
@@ -166,7 +174,15 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if created.Container.Image != imageInfo.ID {
 		t.Fatalf("container image ID=%q, inspected image ID=%q; create must pin immutable image identity", created.Container.Image, imageInfo.ID)
 	}
-	if created.Container.HostConfig.NanoCPUs != 500_000_000 || created.Container.HostConfig.Memory != 256<<20 || created.Container.HostConfig.PidsLimit == nil || *created.Container.HostConfig.PidsLimit != 128 {
+	gotPidsLimit := int64(0)
+	if created.Container.HostConfig.PidsLimit != nil {
+		gotPidsLimit = *created.Container.HostConfig.PidsLimit
+	}
+	wantPidsLimit := policyPidsLimit
+	if wantPidsLimit < 0 {
+		wantPidsLimit = 0
+	}
+	if created.Container.HostConfig.NanoCPUs != 500_000_000 || created.Container.HostConfig.Memory != 256<<20 || gotPidsLimit != wantPidsLimit {
 		t.Fatalf("Podman override resource limits missing: %+v", created.Container.HostConfig)
 	}
 	if err := engine.Start(ctx, h.ID); err != nil {
