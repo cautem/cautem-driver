@@ -1034,6 +1034,9 @@ func isGuestIdentityEnvironment(key string) bool {
 
 func guestWorkloadCredential(declaration string, defaultUID, defaultGID uint32) (*syscall.Credential, error) {
 	if declaration == "" {
+		if defaultUID == uint32(os.Geteuid()) && defaultGID == uint32(os.Getegid()) {
+			return nil, nil
+		}
 		return &syscall.Credential{Uid: defaultUID, Gid: defaultGID}, nil
 	}
 	parts := strings.Split(declaration, ":")
