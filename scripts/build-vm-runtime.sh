@@ -10,7 +10,6 @@ output_dir=${CAUTEM_VM_BUILD_DIR:-"$module_dir/dist/vm"}
 guest_arch=${CAUTEM_VM_GUEST_ARCH:-$(go env GOARCH)}
 host_os=$(go env GOOS)
 host_arch=$(go env GOARCH)
-module_cache=$(go env GOMODCACHE)
 
 case "$host_os/$host_arch" in
   linux/amd64|linux/arm64|darwin/arm64) ;;
@@ -35,12 +34,10 @@ CGO_ENABLED=0 GOOS=linux GOARCH="$guest_arch" go -C "$module_dir" build \
   -trimpath -ldflags="-s -w" \
   -o "$output_dir/cautem-vm-security-probe-linux-$guest_arch" \
   ./internal/vm/testdata/guest-security-probe
-docker run --rm --platform "linux/$guest_arch" \
-  --user "$(id -u):$(id -g)" -e HOME=/tmp -e GOCACHE=/tmp/go-build-cache \
-  -v "$module_dir:/src" -v "$output_dir:/out" -v "$module_cache:/go/pkg/mod:ro" -w /src \
-  golang:1.27.2-alpine sh -c \
-  'GOMODCACHE=/go/pkg/mod CGO_ENABLED=0 GOOS=linux GOARCH="$1" go build -trimpath -ldflags="-s -w" -o "/out/cautem-vm-guest-agent-linux-$1" ./cmd/cautem-vm-guest-agent' \
-  _ "$guest_arch"
+CGO_ENABLED=0 GOOS=linux GOARCH="$guest_arch" go -C "$module_dir" build \
+  -trimpath -ldflags="-s -w" \
+  -o "$output_dir/cautem-vm-guest-agent-linux-$guest_arch" \
+  ./cmd/cautem-vm-guest-agent
 chmod 0755 "$output_dir/cautem-vm-worker" "$output_dir/cautem-vm-guest-agent-linux-$guest_arch"
 chmod 0755 "$output_dir/cautem-init-linux-$guest_arch" "$output_dir/cautem-supervisor-linux-$guest_arch" "$output_dir/cautem-sshd-linux-$guest_arch"
 chmod 0755 "$output_dir/cautem-vm-security-probe-linux-$guest_arch"
