@@ -77,7 +77,7 @@ jobs:
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends patchelf libc6-dev e2fsprogs
+          sudo apt-get install -y --no-install-recommends patchelf libc6-dev e2fsprogs libclang-dev
           mkdir -p "$CAUTEM_VM_RUNTIME_DIR"
           curl --fail --location --silent --show-error \
             https://github.com/libkrun/libkrunfw/releases/download/v5.6.2/libkrunfw-x86_64.tgz \
