@@ -12,8 +12,10 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -22,8 +24,16 @@ func main() {
 		spawnOrphans(os.Args[2], os.Args[3])
 		return
 	}
+	if len(os.Args) == 5 && os.Args[1] == "spawn-child" {
+		spawnChild(os.Args[2], os.Args[3], os.Args[4])
+		return
+	}
+	if len(os.Args) == 4 && os.Args[1] == "--spawn-child-marker" {
+		writeChildTermination(os.Args[2], os.Args[3])
+		return
+	}
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: tcp-echo <serve-tcp|serve-udp|probe-tcp|probe-udp|probe-connect> <address> | tcp-echo spawn-orphans <count> <seconds>")
+		fmt.Fprintln(os.Stderr, "usage: tcp-echo <serve-tcp|serve-udp|probe-tcp|probe-udp|probe-connect> <address> | tcp-echo spawn-orphans <count> <seconds> | tcp-echo spawn-child <pid-file> <exit-file> <seconds>")
 		os.Exit(3)
 	}
 
@@ -44,6 +54,46 @@ func main() {
 		code = 3
 	}
 	os.Exit(code)
+}
+
+func spawnChild(pidFile, exitFile, seconds string) {
+	duration, err := strconv.Atoi(seconds)
+	if err != nil || duration < 1 || duration > 600 {
+		fmt.Fprintf(os.Stderr, "invalid child duration %q\n", seconds)
+		os.Exit(3)
+	}
+	child := exec.Command(os.Args[0], "--spawn-child-marker", pidFile, exitFile)
+	child.Stdout = os.Stdout
+	child.Stderr = os.Stderr
+	if err := child.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "start timeout child: %v\n", err)
+		os.Exit(3)
+	}
+
+	// Keep the ExecSandbox process alive until its execution timeout kills the
+	// process group. The child records that it received termination so the
+	// Gateway integration test can verify descendant cleanup.
+	time.Sleep(time.Duration(duration) * time.Second)
+	if err := child.Wait(); err != nil {
+		fmt.Fprintf(os.Stderr, "wait for timeout child: %v\n", err)
+		os.Exit(3)
+	}
+}
+
+func writeChildTermination(pidFile, exitFile string) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
+	if err := os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "write timeout child PID: %v\n", err)
+		os.Exit(3)
+	}
+	<-signals
+	signal.Stop(signals)
+	if err := os.WriteFile(exitFile, []byte(strconv.Itoa(os.Getpid())+" terminated\n"), 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "write timeout child termination: %v\n", err)
+		os.Exit(3)
+	}
+	os.Exit(0)
 }
 
 func spawnOrphans(countArg, seconds string) {
