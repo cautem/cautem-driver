@@ -37,7 +37,7 @@ jobs:
         with:
           repository: cautem/cautem-core
           path: cautem-core
-          ref: 3e8578194f94048a5c2619d2e1411eac546de985
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -104,7 +104,7 @@ jobs:
         with:
           repository: cautem/cautem-core
           path: cautem-core
-          ref: 3e8578194f94048a5c2619d2e1411eac546de985
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -171,7 +171,7 @@ jobs:
         with:
           repository: cautem/cautem-core
           path: cautem-core
-          ref: 3e8578194f94048a5c2619d2e1411eac546de985
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -236,7 +236,7 @@ jobs:
         with:
           repository: cautem/cautem-core
           path: cautem-core
-          ref: 3e8578194f94048a5c2619d2e1411eac546de985
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
 
       - name: Write go.work
         working-directory: ${{ github.workspace }}
@@ -304,3 +304,82 @@ jobs:
           flags: unittests
           name: codecov-cautem-driver
           fail_ci_if_error: false
+
+  vm-runtime-artifacts:
+    name: VM runtime artifacts - Linux amd64 host
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cautem-driver
+    steps:
+      - name: Checkout cautem-driver
+        uses: actions/checkout@v4
+        with:
+          path: cautem-driver
+
+      - name: Checkout cautem-core
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/cautem-core
+          path: cautem-core
+          ref: 59fec9b4e887827515979fe01303f2d7152a96f6
+
+      - name: Checkout cautem-runtime helpers
+        uses: actions/checkout@v4
+        with:
+          repository: cautem/cautem-runtime
+          path: cautem-runtime
+          ref: c84f3581532e32283bc18233325d52159533e9c2
+
+      - name: Write go.work
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo 'go 1.27.0'
+            echo 'use ('
+            echo '  ./cautem-core'
+            echo '  ./cautem-driver'
+            echo '  ./cautem-runtime'
+            echo ')'
+            echo 'replace github.com/cautem/cautem-core v0.1.0-alpha.1 => ./cautem-core'
+            echo 'replace github.com/cautem/cautem-core v0.3.0 => ./cautem-core'
+          } > "${{ github.workspace }}/go.work"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.2"
+          cache: true
+          cache-dependency-path: |
+            cautem-driver/go.sum
+            cautem-core/go.sum
+            cautem-runtime/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Build VM worker, guest agent and runtime helpers
+        env:
+          CAUTEM_VM_BUILD_DIR: ${{ runner.temp }}/cautem-vm-runtime
+          CAUTEM_VM_GUEST_ARCH: amd64
+        run: ./scripts/build-vm-runtime.sh
+
+      - name: Verify runtime artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "${{ runner.temp }}/cautem-vm-runtime/cautem-vm-worker"
+          for artifact in \
+            cautem-vm-guest-agent-linux-amd64 \
+            cautem-init-linux-amd64 \
+            cautem-supervisor-linux-amd64 \
+            cautem-sshd-linux-amd64; do
+            binary="${{ runner.temp }}/cautem-vm-runtime/$artifact"
+            test -s "$binary"
+            readelf -h "$binary" | grep -q 'Advanced Micro Devices X86-64'
+            if readelf -l "$binary" | grep -q INTERP; then
+              echo "$artifact must be statically linked" >&2
+              exit 1
+            fi
+          done

@@ -57,12 +57,18 @@ func TestNewWithConfigRejectsUnsupportedRuntimeSettings(t *testing.T) {
 	if cfg, err := ConfigFromMap(map[string]any{"image_pull_policy": "missing"}); err != nil || cfg.ImagePullPolicy != "missing" {
 		t.Fatalf("OpenShell image_pull_policy=missing config=%+v err=%v", cfg, err)
 	}
+	if cfg, err := ConfigFromMap(map[string]any{"image_pull_policy": "newer"}); err != nil || cfg.ImagePullPolicy != "newer" {
+		t.Fatalf("Podman image_pull_policy=newer config=%+v err=%v", cfg, err)
+	}
 	if _, err := NewWithConfig(Config{StopTimeoutSecs: -1}); err == nil {
 		t.Fatal("negative stop timeout was accepted")
 	}
+	if _, err := NewWithConfig(Config{GuestTLSCert: "/tmp/client.crt"}); err == nil {
+		t.Fatal("deprecated guest client certificate was accepted")
+	}
 }
 
-func TestConfigFromMapAppliesSupportedOpenShellFieldsAndRejectsInertFields(t *testing.T) {
+func TestConfigFromMapAppliesSupportedCompatFieldsAndRejectsInertFields(t *testing.T) {
 	cfg, err := ConfigFromMap(map[string]any{
 		"default_image": "sandbox:test", "network_name": "ws-net", "image_pull_policy": "Missing",
 		"host_gateway_ip": "10.0.0.2", "stop_timeout_secs": int64(15), "sandbox_pids_limit": int64(1024),
@@ -72,10 +78,10 @@ func TestConfigFromMapAppliesSupportedOpenShellFieldsAndRejectsInertFields(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.DefaultImage != "sandbox:test" || cfg.NetworkName != "ws-net" || cfg.ImagePullPolicy != "missing" || cfg.StopTimeoutSecs != 15 || cfg.PidsLimit != 1024 || !cfg.EnableBindMounts || cfg.GatewayGRPCPort != 7443 || cfg.HealthCheckIntervalSecs != 30 || cfg.UsernsMode != "auto:size=65536" {
+	if cfg.DefaultImage != "sandbox:test" || cfg.NetworkName != "ws-net" || cfg.ImagePullPolicy != "missing" || cfg.StopTimeoutSecs != 15 || !cfg.StopTimeoutConfigured || cfg.PidsLimit != 1024 || !cfg.EnableBindMounts || cfg.GatewayGRPCPort != 7443 || cfg.HealthCheckIntervalSecs != 30 || cfg.UsernsMode != "auto:size=65536" {
 		t.Fatalf("config=%+v", cfg)
 	}
-	if cfg, err := ConfigFromMap(nil); err != nil || cfg.HealthCheckIntervalSecs != defaultHealthCheckIntervalSecs {
+	if cfg, err := ConfigFromMap(nil); err != nil || cfg.HealthCheckIntervalSecs != defaultHealthCheckIntervalSecs || cfg.StopTimeoutSecs != defaultStopTimeoutSecs || cfg.StopTimeoutConfigured {
 		t.Fatalf("default config=%+v err=%v", cfg, err)
 	}
 	for _, value := range []any{"auto", "auto:size=65536", "keep-id:uid=1000,gid=1000", "host", "nomap", "no-map"} {
@@ -89,7 +95,7 @@ func TestConfigFromMapAppliesSupportedOpenShellFieldsAndRejectsInertFields(t *te
 			t.Errorf("userns %q canonicalized to %q, err=%v; want %q", input, cfg.UsernsMode, err, want)
 		}
 	}
-	for _, input := range []map[string]any{{"userns": "unknown"}, {"userns": "private"}, {"health_check_interval_secs": int64(-1)}, {"health_check_interval_secs": int64(9_223_372_037)}, {"uidmap": []any{"0:0:1"}}, {"gidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"0:0:1"}, "gidmap": []string{"0:0:0"}}, {"userns": "private", "uidmap": []string{"0:0:1:2"}, "gidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"4294967296:0:1"}, "gidmap": []string{"0:0:1"}}} {
+	for _, input := range []map[string]any{{"userns": "unknown"}, {"userns": ""}, {"userns": "private"}, {"socket_path": ""}, {"default_image": ""}, {"ssh_socket_path": ""}, {"provider_spiffe_workload_api_socket": ""}, {"sandbox_pids_limit": int64(0)}, {"sandbox_pids_limit": ""}, {"stop_timeout_secs": int64(^uint32(0)) + 1}, {"stop_timeout_secs": ""}, {"health_check_interval_secs": int64(-1)}, {"health_check_interval_secs": int64(0)}, {"health_check_interval_secs": int64(9_223_372_037)}, {"health_check_interval_secs": ""}, {"image_pull_policy": ""}, {"uidmap": []any{"0:0:1"}}, {"gidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"0:0:1"}, "gidmap": []string{"0:0:0"}}, {"userns": "private", "uidmap": []string{"0:0:1:2"}, "gidmap": []string{"0:0:1"}}, {"userns": "private", "uidmap": []string{"4294967296:0:1"}, "gidmap": []string{"0:0:1"}}} {
 		if _, err := ConfigFromMap(input); err == nil {
 			t.Errorf("unsupported or invalid settings accepted: %#v", input)
 		}
@@ -101,21 +107,97 @@ func TestConfigFromMapAppliesSupportedOpenShellFieldsAndRejectsInertFields(t *te
 	if len(cfg.UIDMap) != 2 || cfg.UIDMap[0] != (IDMapping{ContainerID: 0, HostID: 100000, Size: 65536}) || len(cfg.GIDMap) != 1 || cfg.GIDMap[0] != (IDMapping{ContainerID: 0, HostID: 100000, Size: 65536}) {
 		t.Fatalf("ID mappings decoded incorrectly: %+v", cfg)
 	}
-	if _, err := ConfigFromMap(map[string]any{"supervisor_image": "ghcr.io/example/supervisor"}); err == nil {
-		t.Fatal("unsupported supervisor_image silently accepted")
+	emptyMaps, err := ConfigFromMap(map[string]any{"uidmap": []any{}, "gidmap": []string{}})
+	if err != nil || len(emptyMaps.UIDMap) != 0 || len(emptyMaps.GIDMap) != 0 {
+		t.Fatalf("explicit empty ID maps should preserve the no-mapping effect: config=%+v err=%v", emptyMaps, err)
+	}
+	for _, field := range []string{"sandbox_runtime_image", "supervisor_image"} {
+		if _, err := ConfigFromMap(map[string]any{field: "ghcr.io/example/runtime"}); err == nil {
+			t.Fatalf("unsupported %s silently accepted", field)
+		}
 	}
 }
 
-func TestConfigFromMapValidatesGuestTLSAsAnAllOrNonePathSet(t *testing.T) {
+func TestConfigFromMapRejectsExplicitNullForEverySupportedField(t *testing.T) {
+	fields := []string{
+		"socket_path", "default_image", "network_name", "host_gateway_ip", "guest_tls_ca", "guest_tls_cert", "guest_tls_key",
+		"https_proxy", "no_proxy", "proxy_auth_file", "proxy_auth_allow_insecure", "proxy_connect_by_hostname", "proxy_ca_bundle",
+		"registry_auth_file", "egress_ca_bundle", "reconcile_data_ownership", "image_pull_policy", "provider_spiffe_workload_api_socket",
+		"grpc_endpoint", "ssh_socket_path", "sandbox_ssh_socket_path", "cautem_internal_cleanup_manifest_dir", "stop_timeout_secs", "gateway_port",
+		"sandbox_pids_limit", "enable_bind_mounts", "health_check_interval_secs", "userns", "uidmap", "gidmap",
+		"app_armor_profile", "allow_driver_config", "resource_admission",
+	}
+	for _, input := range []map[string]any{{"guest_tls_ca": ""}, {"guest_tls_cert": ""}, {"guest_tls_key": ""}} {
+		if _, err := ConfigFromMap(input); err == nil {
+			t.Errorf("accepted explicitly empty guest TLS setting: %#v", input)
+		}
+	}
+	for _, field := range fields {
+		t.Run(field, func(t *testing.T) {
+			if _, err := ConfigFromMap(map[string]any{field: nil}); err == nil {
+				t.Fatalf("explicit null for supported field %q was silently accepted", field)
+			}
+		})
+	}
+}
+
+func TestConfigFromMapUsesPinnedSSHSocketFieldAndRejectsConflictingAlias(t *testing.T) {
+	cfg, err := ConfigFromMap(map[string]any{"ssh_socket_path": "/run/quarshell/ssh.sock"})
+	if err != nil || cfg.SandboxSSHSocketPath != "/run/quarshell/ssh.sock" {
+		t.Fatalf("pinned ssh_socket_path=%q err=%v", cfg.SandboxSSHSocketPath, err)
+	}
+	if _, err := ConfigFromMap(map[string]any{"ssh_socket_path": "/run/quarshell/ssh.sock", "sandbox_ssh_socket_path": "/run/legacy/ssh.sock"}); err == nil {
+		t.Fatal("accepted conflicting SSH socket path aliases")
+	}
+}
+
+func TestConfigFromMapPreservesExplicitZeroStopTimeout(t *testing.T) {
+	cfg, err := ConfigFromMap(map[string]any{"stop_timeout_secs": int64(0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StopTimeoutSecs != 0 || !cfg.StopTimeoutConfigured {
+		t.Fatalf("explicit stop_timeout_secs=0 config=%+v", cfg)
+	}
+}
+
+func TestConfigFromMapParsesDriverConfigAdmissionPolicy(t *testing.T) {
+	cfg, err := ConfigFromMap(map[string]any{
+		"allow_driver_config": true,
+		"resource_admission": map[string]any{
+			"enabled":         false,
+			"required_labels": map[string]any{},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AllowDriverConfig || cfg.ResourceAdmission == nil || cfg.ResourceAdmission.Enabled || len(cfg.ResourceAdmission.RequiredLabels) != 0 {
+		t.Fatalf("driver admission config=%+v", cfg)
+	}
+	for _, value := range []any{
+		nil,
+		map[string]any{"unknown": true},
+		map[string]any{"enabled": "false"},
+		map[string]any{"required_labels": map[string]any{}},
+		map[string]any{"required_labels": map[string]any{"example.com/approval": 1}},
+	} {
+		if _, err := ConfigFromMap(map[string]any{"resource_admission": value}); err == nil {
+			t.Errorf("accepted invalid resource_admission value %#v", value)
+		}
+	}
+}
+
+func TestConfigFromMapAcceptsGuestTLSCAAndRejectsClientCertificates(t *testing.T) {
 	dir := t.TempDir()
 	paths := []string{filepath.Join(dir, "ca.pem"), filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")}
-	cfg, err := ConfigFromMap(map[string]any{"guest_tls_ca": paths[0], "guest_tls_cert": paths[1], "guest_tls_key": paths[2]})
-	if err != nil || cfg.GuestTLSCA != paths[0] || cfg.GuestTLSCert != paths[1] || cfg.GuestTLSKey != paths[2] {
-		t.Fatalf("TLS config=%+v err=%v", cfg, err)
+	cfg, err := ConfigFromMap(map[string]any{"guest_tls_ca": paths[0]})
+	if err != nil || cfg.GuestTLSCA != paths[0] {
+		t.Fatalf("CA-only TLS config=%+v err=%v", cfg, err)
 	}
-	for _, input := range []map[string]any{{"guest_tls_ca": paths[0]}, {"guest_tls_ca": "relative/ca.pem", "guest_tls_cert": paths[1], "guest_tls_key": paths[2]}} {
+	for _, input := range []map[string]any{{"guest_tls_ca": "relative/ca.pem"}, {"guest_tls_cert": paths[1]}, {"guest_tls_key": paths[2]}, {"guest_tls_ca": paths[0], "guest_tls_cert": paths[1], "guest_tls_key": paths[2]}} {
 		if _, err := ConfigFromMap(input); err == nil {
-			t.Errorf("accepted incomplete/unsafe guest TLS paths: %#v", input)
+			t.Errorf("accepted invalid or unsupported guest TLS config: %#v", input)
 		}
 	}
 }

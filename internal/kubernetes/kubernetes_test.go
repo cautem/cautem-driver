@@ -17,6 +17,24 @@ func TestCreateRequiresTrustedRuntimeConfiguration(t *testing.T) {
 	}
 }
 
+func TestValidateSpecRejectsUnsupportedGatewayRuntimeControls(t *testing.T) {
+	tests := []struct {
+		name string
+		spec driver.Spec
+		want string
+	}{
+		{name: "pids limit", spec: driver.Spec{PidsLimit: 512}, want: "pids limit"},
+		{name: "CDI devices", spec: driver.Spec{CDIDevices: []string{"nvidia.com/gpu=0"}}, want: "CDI device IDs"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := New().ValidateSpec(test.spec); err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("ValidateSpec() error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
 func TestDriverCreateRunsCautemCreateSequence(t *testing.T) {
 	workspace := "team-a"
 	policyPath := t.TempDir() + "/policy.yaml"

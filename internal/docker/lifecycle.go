@@ -44,6 +44,9 @@ func (d *Driver) Start(ctx context.Context, id core.ID) error {
 		return fmt.Errorf("docker start: container config is unavailable")
 	}
 	labels := info.Container.Config.Labels
+	if err := d.validateExistingResourceAdmission(ctx, info.Container); err != nil {
+		return fmt.Errorf("docker start resource admission: %w", err)
+	}
 	name := labels[labelName]
 	proxyID, proxyPort, hasProxy, err := d.ensureProxyRunning(ctx, name)
 	if err != nil {

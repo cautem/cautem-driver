@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	core "github.com/cautem/cautem-core"
+	"github.com/cautem/cautem-driver/driver"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )
@@ -19,24 +22,43 @@ import (
 // egress proxy sidecar (where OCSF agent-observation events are emitted).
 // When follow is true, starts from the last 500 lines per container.
 func (d *Driver) Logs(ctx context.Context, id core.ID, follow bool, w io.Writer) error {
+	tail := uint32(0)
+	if follow {
+		tail = 500
+	}
+	return d.LogsWithOptions(ctx, id, driver.LogOptions{Follow: follow, Tail: tail, TailSet: follow, Source: "all"}, w)
+}
+
+// LogsWithOptions streams selected sandbox and proxy container logs.
+func (d *Driver) LogsWithOptions(ctx context.Context, id core.ID, logOpts driver.LogOptions, w io.Writer) error {
 	if w == nil {
 		w = os.Stdout
 	}
 	opts := client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
-		Follow:     follow,
+		Follow:     logOpts.Follow,
 		Timestamps: false,
 	}
-	if follow {
-		opts.Tail = "500"
+	if logOpts.TailSet || logOpts.Tail > 0 {
+		opts.Tail = strconv.FormatUint(uint64(logOpts.Tail), 10)
+	}
+	if logOpts.Since != "" {
+		if duration, err := time.ParseDuration(logOpts.Since); err == nil {
+			opts.Since = strconv.FormatInt(time.Now().Add(-duration).Unix(), 10)
+		} else if timestamp, err := time.Parse(time.RFC3339Nano, logOpts.Since); err == nil {
+			opts.Since = strconv.FormatInt(timestamp.Unix(), 10)
+		} else {
+			return fmt.Errorf("docker logs: invalid --since %q", logOpts.Since)
+		}
 	}
 
 	type src struct {
 		id     string
 		prefix string
 	}
-	sources := []src{{id: string(id), prefix: "sandbox"}}
+	sandboxSource := src{id: string(id), prefix: "sandbox"}
+	var proxySource *src
 
 	if info, err := d.cli.ContainerInspect(ctx, string(id), client.ContainerInspectOptions{}); err == nil && info.Container.Config != nil {
 		name := info.Container.Config.Labels[labelName]
@@ -46,9 +68,31 @@ func (d *Driver) Logs(ctx context.Context, id core.ID, follow bool, w io.Writer)
 		if name != "" {
 			proxyName := "cautem-proxy-" + name
 			if _, err := d.cli.ContainerInspect(ctx, proxyName, client.ContainerInspectOptions{}); err == nil {
-				sources = append(sources, src{id: proxyName, prefix: "proxy"})
+				found := src{id: proxyName, prefix: "proxy"}
+				proxySource = &found
 			}
 		}
+	}
+	source := logOpts.Source
+	if source == "" {
+		source = "all"
+	}
+	var sources []src
+	switch source {
+	case "all":
+		sources = append(sources, sandboxSource)
+		if proxySource != nil {
+			sources = append(sources, *proxySource)
+		}
+	case "sandbox":
+		sources = []src{sandboxSource}
+	case "proxy":
+		if proxySource == nil {
+			return fmt.Errorf("docker logs: proxy source is unavailable for sandbox %q", id)
+		}
+		sources = []src{*proxySource}
+	default:
+		return fmt.Errorf("docker logs: invalid source %q", source)
 	}
 
 	if len(sources) == 1 {

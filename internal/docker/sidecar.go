@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -157,16 +158,21 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 		Binds:       binds,
 		NetworkMode: container.NetworkMode(netName),
 		ExtraHosts:  d.hostGatewayExtraHosts(),
-		LogConfig:   sandboxLogConfig(),
+		LogConfig:   sandboxLogConfig(d.runtimeConfig.LogDriver),
 		Resources: container.Resources{
 			PidsLimit: resolvePidsLimit(d.configuredPidsLimit(pidsLimit)),
 		},
 	}
-	networking := &network.NetworkingConfig{
-		EndpointsConfig: map[string]*network.EndpointSettings{
-			netName: {Aliases: []string{"cautem-proxy", ctrName}},
-		},
+	proxyEndpoint := &network.EndpointSettings{Aliases: []string{"cautem-proxy", ctrName}}
+	if d.runtimeConfig.BackendID == "podman" {
+		proxyIP, sandboxIP, err := d.staticPodmanNetworkIPs(ctx, netName)
+		if err != nil {
+			return fmt.Errorf("docker proxy %s: reserve Podman isolated-network addresses: %w", ctrName, err)
+		}
+		proxyEndpoint.IPAMConfig = &network.EndpointIPAMConfig{IPv4Address: proxyIP}
+		host.ExtraHosts = append(host.ExtraHosts, "cautem-"+name+":"+sandboxIP.String())
 	}
+	networking := &network.NetworkingConfig{EndpointsConfig: map[string]*network.EndpointSettings{netName: proxyEndpoint}}
 	resp, err := d.cli.ContainerCreate(ctx, client.ContainerCreateOptions{Config: cfg, HostConfig: host, NetworkingConfig: networking, Name: ctrName})
 	if err != nil {
 		return fmt.Errorf("docker create proxy %s: %w", ctrName, err)
@@ -192,6 +198,47 @@ func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, bin
 		return err
 	}
 	return nil
+}
+
+func (d *Driver) staticPodmanProxyIP(ctx context.Context, netName string) (netip.Addr, error) {
+	proxyIP, _, err := d.staticPodmanNetworkIPs(ctx, netName)
+	return proxyIP, err
+}
+
+func (d *Driver) staticPodmanNetworkIPs(ctx context.Context, netName string) (netip.Addr, netip.Addr, error) {
+	if d == nil || d.cli == nil || strings.TrimSpace(netName) == "" {
+		return netip.Addr{}, netip.Addr{}, fmt.Errorf("podman network client or name is unavailable")
+	}
+	inspected, err := d.cli.NetworkInspect(ctx, netName, client.NetworkInspectOptions{})
+	if err != nil {
+		return netip.Addr{}, netip.Addr{}, fmt.Errorf("inspect isolated network: %w", err)
+	}
+	for _, config := range inspected.Network.IPAM.Config {
+		if !config.Subnet.IsValid() || !config.Subnet.Addr().Is4() || config.Subnet.Bits() > 30 || !config.Gateway.Is4() || !config.Subnet.Contains(config.Gateway) {
+			continue
+		}
+		proxyIP := config.Gateway.Next()
+		sandboxIP := proxyIP.Next()
+		if usablePodmanNetworkIP(config.Subnet, config.Gateway, proxyIP) && usablePodmanNetworkIP(config.Subnet, config.Gateway, sandboxIP) {
+			return proxyIP, sandboxIP, nil
+		}
+	}
+	return netip.Addr{}, netip.Addr{}, fmt.Errorf("isolated network %q has no room for reserved proxy and sandbox IPv4 addresses", netName)
+}
+
+func usablePodmanNetworkIP(subnet netip.Prefix, gateway, candidate netip.Addr) bool {
+	if !candidate.Is4() || !subnet.Contains(candidate) || candidate == gateway || candidate == subnet.Masked().Addr() {
+		return false
+	}
+	address := candidate.As4()
+	base := subnet.Masked().Addr().As4()
+	var hostMask uint32
+	for bit := subnet.Bits(); bit < 32; bit++ {
+		hostMask = (hostMask << 1) | 1
+	}
+	broadcast := (uint32(base[0])<<24 | uint32(base[1])<<16 | uint32(base[2])<<8 | uint32(base[3])) | hostMask
+	value := uint32(address[0])<<24 | uint32(address[1])<<16 | uint32(address[2])<<8 | uint32(address[3])
+	return value != broadcast
 }
 
 func (d *Driver) waitProxyCA(ctx context.Context, proxyID string, timeout time.Duration) error {

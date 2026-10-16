@@ -29,6 +29,10 @@ func (d *Driver) create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	if err != nil {
 		return driver.Handle{}, err
 	}
+	restartPolicy, err := driver.NormalizeMainProcessRestartPolicy(spec.MainProcessRestartPolicy)
+	if err != nil {
+		return driver.Handle{}, fmt.Errorf("kubernetes driver: %w", err)
+	}
 	if err := d.runtimeConfig.Validate(); err != nil {
 		return driver.Handle{}, err
 	}
@@ -114,7 +118,8 @@ func (d *Driver) create(ctx context.Context, spec driver.Spec) (driver.Handle, e
 	}
 	resource, err := renderCautemAgentSandboxResource(driverConfig, cautemWorkloadRenderParams{
 		Base: renderParams, Command: append([]string(nil), spec.Command...), Env: append([]string(nil), spec.Env...),
-		BoundaryPort: renderParams.BoundaryPort,
+		RestartPolicy: restartPolicy,
+		BoundaryPort:  renderParams.BoundaryPort,
 	})
 	if err != nil {
 		return driver.Handle{}, err

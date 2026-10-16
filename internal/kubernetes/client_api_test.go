@@ -13,7 +13,7 @@ import (
 // pinned OpenShell Kubernetes driver. The fake implements the typed API seam;
 // these tests deliberately do not introduce an HTTP client or hand-written
 // Kubernetes REST transport.
-func TestOpenShellSandboxAPIVersionProbePrefersV1Beta1(t *testing.T) {
+func TestCompatSandboxAPIVersionProbePrefersV1Beta1(t *testing.T) {
 	fake := &fakeSandboxAPIClient{
 		listErrors: map[string]error{
 			sandboxAPIVersionV1Beta1:  nil,
@@ -35,7 +35,7 @@ func TestOpenShellSandboxAPIVersionProbePrefersV1Beta1(t *testing.T) {
 	}})
 }
 
-func TestOpenShellSandboxAPIVersionProbeFallsBackOnNotFound(t *testing.T) {
+func TestCompatSandboxAPIVersionProbeFallsBackOnNotFound(t *testing.T) {
 	fake := &fakeSandboxAPIClient{
 		listErrors: map[string]error{
 			sandboxAPIVersionV1Beta1:  sandboxAPIStatusError{code: 404, message: "could not find the requested resource"},
@@ -56,7 +56,7 @@ func TestOpenShellSandboxAPIVersionProbeFallsBackOnNotFound(t *testing.T) {
 	})
 }
 
-func TestOpenShellSandboxAPIVersionProbeKeepsNonNotFoundErrors(t *testing.T) {
+func TestCompatSandboxAPIVersionProbeKeepsNonNotFoundErrors(t *testing.T) {
 	for _, statusCode := range []int{401, 403, 500} {
 		t.Run(strconv.Itoa(statusCode), func(t *testing.T) {
 			fake := &fakeSandboxAPIClient{
@@ -82,7 +82,7 @@ func TestOpenShellSandboxAPIVersionProbeKeepsNonNotFoundErrors(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxAPIVersionProbeReportsMissingCRD(t *testing.T) {
+func TestCompatSandboxAPIVersionProbeReportsMissingCRD(t *testing.T) {
 	fake := &fakeSandboxAPIClient{
 		listErrors: map[string]error{
 			sandboxAPIVersionV1Beta1:  sandboxAPIStatusError{code: 404, message: "not found"},
@@ -103,7 +103,7 @@ func TestOpenShellSandboxAPIVersionProbeReportsMissingCRD(t *testing.T) {
 	})
 }
 
-func TestOpenShellSandboxAPIVersionProbeHonorsContextCancellation(t *testing.T) {
+func TestCompatSandboxAPIVersionProbeHonorsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	fake := &fakeSandboxAPIClient{}
@@ -117,7 +117,7 @@ func TestOpenShellSandboxAPIVersionProbeHonorsContextCancellation(t *testing.T) 
 	}
 }
 
-func TestOpenShellSandboxAPIVersionResolverCachesSuccessfulProbe(t *testing.T) {
+func TestCompatSandboxAPIVersionResolverCachesSuccessfulProbe(t *testing.T) {
 	resolver := &sandboxAPIVersionResolver{}
 	fake := &fakeSandboxAPIClient{}
 
@@ -142,7 +142,7 @@ func TestOpenShellSandboxAPIVersionResolverCachesSuccessfulProbe(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxAPIVersionResolverDoesNotCacheFailures(t *testing.T) {
+func TestCompatSandboxAPIVersionResolverDoesNotCacheFailures(t *testing.T) {
 	resolver := &sandboxAPIVersionResolver{}
 	fake := &fakeSandboxAPIClient{
 		listErrors: map[string]error{
@@ -163,7 +163,7 @@ func TestOpenShellSandboxAPIVersionResolverDoesNotCacheFailures(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxOperatingStateUsesVersionSpecificFields(t *testing.T) {
+func TestCompatSandboxOperatingStateUsesVersionSpecificFields(t *testing.T) {
 	tests := []struct {
 		name    string
 		version string
@@ -188,7 +188,7 @@ func TestOpenShellSandboxOperatingStateUsesVersionSpecificFields(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxOperatingStateRejectsUnknownVersion(t *testing.T) {
+func TestCompatSandboxOperatingStateRejectsUnknownVersion(t *testing.T) {
 	if _, err := sandboxDesiredStateFields("v9", true); err == nil {
 		t.Fatal("sandboxDesiredStateFields(v9) should fail rather than assume the v1alpha1 schema")
 	}

@@ -30,10 +30,13 @@ const (
 //	CAUTEM_DOCKER_LOG_DRIVER   — json-file (default) or none
 //	CAUTEM_DOCKER_LOG_MAX_SIZE — json-file max-size (default 10m)
 //	CAUTEM_DOCKER_LOG_MAX_FILE — json-file max-file (default 3)
-func sandboxLogConfig() container.LogConfig {
+func sandboxLogConfig(defaultOverride string) container.LogConfig {
 	driver := strings.ToLower(strings.TrimSpace(os.Getenv(envDockerLogDriver)))
 	if driver == "" {
 		driver = defaultLogDriver
+		if strings.TrimSpace(defaultOverride) != "" {
+			driver = strings.ToLower(strings.TrimSpace(defaultOverride))
+		}
 	}
 	switch driver {
 	case "none":
@@ -57,6 +60,8 @@ func sandboxLogConfig() container.LogConfig {
 				"max-file": maxFile,
 			},
 		}
+	case "k8s-file":
+		return container.LogConfig{Type: "k8s-file"}
 	default:
 		// Unknown driver: fall back to bounded json-file rather than silent unbounded.
 		return container.LogConfig{

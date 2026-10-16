@@ -4,11 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cautem/cautem-driver/driver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestRenderCautemAgentSandboxResourceInstallsRuntimeAndUsesPrivateProxyBoundary(t *testing.T) {
 	params := testCautemWorkloadRenderParams()
+	params.RestartPolicy = "on-failure"
 	resource, err := renderCautemAgentSandboxResource(SandboxDriverConfig{}, params)
 	if err != nil {
 		t.Fatalf("renderCautemAgentSandboxResource() error = %v", err)
@@ -59,6 +61,9 @@ func TestRenderCautemAgentSandboxResourceInstallsRuntimeAndUsesPrivateProxyBound
 	}
 	if renderEnvValue(t, container, "CAUTEM_SUPERVISOR_CONTROL_ENDPOINT") != runtimeServiceFQDN("os-supervisor-"+params.Base.SandboxID, params.Base.Namespace)+":5502" {
 		t.Fatalf("control endpoint env = %#v", container["env"])
+	}
+	if got := renderEnvValue(t, container, driver.MainProcessRestartPolicyEnv); got != "on-failure" {
+		t.Fatalf("main process restart policy = %q; want on-failure", got)
 	}
 	proxyURL := "http://" + runtimeServiceFQDN("os-proxy-"+params.Base.SandboxID, params.Base.Namespace) + ":3128"
 	for _, key := range []string{"HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"} {
@@ -118,6 +123,7 @@ func TestCautemWorkloadEnvironmentRejectsCredentialAndProxyOverrides(t *testing.
 	for _, entry := range []string{
 		"CAUTEM_SUPERVISOR_CONTROL_ENDPOINT=attacker:1",
 		"CAUTEM_RELAY_TARGET_SERVER_KEY=/tmp/key",
+		driver.MainProcessRestartPolicyEnv + "=always",
 		"HTTP_PROXY=http://attacker:1",
 	} {
 		params := testCautemWorkloadRenderParams()

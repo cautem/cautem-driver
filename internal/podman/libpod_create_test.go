@@ -61,6 +61,34 @@ func TestBuildNativeSpecAutoNamespaceRequestsAutomaticMappings(t *testing.T) {
 	}
 }
 
+func TestBuildNativeSpecCarriesPodmanLogConfiguration(t *testing.T) {
+	options := client.ContainerCreateOptions{
+		Config: &container.Config{Image: "alpine"},
+		HostConfig: &container.HostConfig{
+			LogConfig: container.LogConfig{Type: "k8s-file"},
+		},
+	}
+	spec, err := buildNativeSpec(options, "keep-id", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.LogConfiguration == nil || spec.LogConfiguration.Driver != "k8s-file" {
+		t.Fatalf("log configuration=%+v, want k8s-file", spec.LogConfiguration)
+	}
+	body, err := json.Marshal(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(body, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	logConfig, ok := decoded["log_configuration"].(map[string]any)
+	if !ok || logConfig["driver"] != "k8s-file" {
+		t.Fatalf("serialized native log configuration=%s", body)
+	}
+}
+
 func TestBuildNativeSpecUserNamespaceModesMatchPinnedLibpodContract(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -128,6 +156,27 @@ func TestBuildNativeSpecRejectsUntranslatedOptions(t *testing.T) {
 	privileged := client.ContainerCreateOptions{Config: &container.Config{Image: "alpine"}, HostConfig: &container.HostConfig{Privileged: true}}
 	if _, err := buildNativeSpec(privileged, "private", []IDMapping{{Size: 1}}, []IDMapping{{Size: 1}}); err == nil {
 		t.Fatal("privileged container was silently downgraded by native userns create")
+	}
+}
+
+func TestBuildNativeSpecTranslatesAppArmorOption(t *testing.T) {
+	options := client.ContainerCreateOptions{
+		Config:     &container.Config{Image: "alpine"},
+		HostConfig: &container.HostConfig{SecurityOpt: []string{"no-new-privileges:true", "apparmor=unconfined"}},
+	}
+	spec, err := buildNativeSpec(options, "private", []IDMapping{{Size: 1}}, []IDMapping{{Size: 1}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !spec.NoNewPrivileges || spec.ApparmorProfile != "unconfined" {
+		t.Fatalf("native AppArmor/no-new-privileges settings=%+v", spec)
+	}
+	for _, securityOpts := range [][]string{{"apparmor="}, {"apparmor=unconfined", "apparmor=profile"}} {
+		invalid := options
+		invalid.HostConfig = &container.HostConfig{SecurityOpt: securityOpts}
+		if _, err := buildNativeSpec(invalid, "private", []IDMapping{{Size: 1}}, []IDMapping{{Size: 1}}); err == nil {
+			t.Errorf("invalid AppArmor options %v were accepted", securityOpts)
+		}
 	}
 }
 

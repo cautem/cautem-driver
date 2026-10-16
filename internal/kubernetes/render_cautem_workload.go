@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cautem/cautem-driver/driver"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -21,10 +22,11 @@ const (
 )
 
 type cautemWorkloadRenderParams struct {
-	Base         agentSandboxRenderParams
-	Command      []string
-	Env          []string
-	BoundaryPort int64
+	Base          agentSandboxRenderParams
+	Command       []string
+	Env           []string
+	RestartPolicy string
+	BoundaryPort  int64
 }
 
 // renderCautemAgentSandboxResource renders the untrusted workload Pod template
@@ -304,6 +306,7 @@ func cautemWorkloadEnvironment(params cautemWorkloadRenderParams) ([]any, error)
 	proxyURL := "http://" + net.JoinHostPort(proxyService, fmt.Sprint(cautemProxyListenPort))
 	noProxy := strings.Join([]string{"localhost", "127.0.0.1", "::1", workloadService, controlService, proxyService}, ",")
 	managed := map[string]string{
+		driver.MainProcessRestartPolicyEnv:      params.RestartPolicy,
 		"CAUTEM_POLICY":                         cautemWorkloadPrivateDir + "/policy.yaml",
 		"CAUTEM_SUPERVISOR_CONTROL_ENDPOINT":    endpoint,
 		"CAUTEM_SUPERVISOR_CONTROL_CLIENT_CA":   cautemWorkloadPrivateDir + "/control-client-ca.pem",
@@ -336,7 +339,7 @@ func cautemWorkloadEnvironment(params cautemWorkloadRenderParams) ([]any, error)
 
 func isCautemWorkloadManagedEnvironmentKey(key string) bool {
 	switch key {
-	case "CAUTEM_POLICY", "CAUTEM_SUPERVISOR_CONTROL_SOCKET", "CAUTEM_SUPERVISOR_CONTROL_ENDPOINT", "CAUTEM_SUPERVISOR_CONTROL_LISTEN", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_CA", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_CERT", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_KEY", "CAUTEM_SUPERVISOR_CONTROL_PRIVATE_DIR", "CAUTEM_SUPERVISOR_CONTROL_SERVER_CA", "CAUTEM_SUPERVISOR_CONTROL_SERVER_CERT", "CAUTEM_SUPERVISOR_CONTROL_SERVER_KEY",
+	case driver.MainProcessRestartPolicyEnv, "CAUTEM_POLICY", "CAUTEM_SUPERVISOR_CONTROL_SOCKET", "CAUTEM_SUPERVISOR_CONTROL_ENDPOINT", "CAUTEM_SUPERVISOR_CONTROL_LISTEN", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_CA", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_CERT", "CAUTEM_SUPERVISOR_CONTROL_CLIENT_KEY", "CAUTEM_SUPERVISOR_CONTROL_PRIVATE_DIR", "CAUTEM_SUPERVISOR_CONTROL_SERVER_CA", "CAUTEM_SUPERVISOR_CONTROL_SERVER_CERT", "CAUTEM_SUPERVISOR_CONTROL_SERVER_KEY",
 		"CAUTEM_RELAY_TARGET_ENDPOINT", "CAUTEM_RELAY_TARGET_LISTEN", "CAUTEM_RELAY_TARGET_CLIENT_CA", "CAUTEM_RELAY_TARGET_SERVER_CERT", "CAUTEM_RELAY_TARGET_SERVER_KEY", "CAUTEM_RELAY_TARGET_SSH_SOCKET", "CAUTEM_RELAY_TARGET_SERVER_CA", "CAUTEM_RELAY_TARGET_CLIENT_CERT", "CAUTEM_RELAY_TARGET_CLIENT_KEY", "CAUTEM_RELAY_TARGET_SOCKET",
 		"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "all_proxy", "no_proxy":
 		return true

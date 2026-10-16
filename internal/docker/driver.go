@@ -8,6 +8,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/driver"
 )
 
@@ -57,35 +58,48 @@ type Driver struct {
 
 // RuntimeConfig contains settings shared by Docker-compatible Engine backends.
 type RuntimeConfig struct {
-	RuntimeContext                  string
-	EnableBindMounts                bool
-	DefaultImage                    string
-	NetworkName                     string
-	HostGatewayIP                   string
-	ImagePullPolicy                 string
-	StopTimeoutSecs                 int
-	PidsLimit                       int64
-	ProviderSPIFFEWorkloadAPISocket string
-	GatewayGRPCEndpoint             string
-	GatewayGRPCPort                 int
-	SandboxSSHSocketPath            string
-	CleanupManifestDir              string
-	HealthCheckIntervalSecs         int64
-	UsernsMode                      string
-	SandboxNamespace                string
-	DefaultCPU                      float64
-	DefaultMemoryBytes              int64
-	GuestTLSCA                      string
-	GuestTLSCert                    string
-	GuestTLSKey                     string
-	UpstreamProxyURL                string
-	UpstreamProxyNoProxy            string
-	UpstreamProxyAuthFile           string
-	UpstreamProxyAuthAllowInsecure  bool
-	UpstreamProxyCABundle           string
-	UpstreamProxyConnectByHostname  bool
-	EgressCABundle                  string
-	ReconcileDataOwnership          bool
+	BackendID         string
+	RuntimeContext    string
+	EnableBindMounts  bool
+	AllowDriverConfig bool
+	ResourceAdmission *resourceadmission.Config
+	DefaultImage      string
+	AppArmorProfile   AppArmorProfile
+	// AppArmorSupportValidated is set by backends that verify support through
+	// their native API before constructing this Engine adapter.
+	AppArmorSupportValidated bool
+	// LogDriver overrides the Docker-specific default for compatible engines
+	// whose supported log backend differs (for example Podman's k8s-file).
+	LogDriver                                string
+	NetworkName                              string
+	HostGatewayIP                            string
+	ImagePullPolicy                          string
+	StopTimeoutSecs                          int
+	StopTimeoutConfigured                    bool
+	PidsLimit                                int64
+	ProviderSPIFFEWorkloadAPISocket          string
+	GatewayGRPCEndpoint                      string
+	GatewayGRPCPort                          int
+	SandboxSSHSocketPath                     string
+	CleanupManifestDir                       string
+	HealthCheckIntervalSecs                  int64
+	UsernsMode                               string
+	SandboxNamespace                         string
+	DefaultCPU                               float64
+	DefaultMemoryBytes                       int64
+	GuestTLSCA                               string
+	GuestTLSCert                             string
+	GuestTLSKey                              string
+	UpstreamProxyURL                         string
+	UpstreamProxyNoProxy                     string
+	UpstreamProxyAuthFile                    string
+	UpstreamProxyAuthAllowInsecure           bool
+	UpstreamProxyAuthAllowInsecureConfigured bool
+	UpstreamProxyCABundle                    string
+	UpstreamProxyConnectByHostname           bool
+	UpstreamProxyConnectByHostnameConfigured bool
+	EgressCABundle                           string
+	ReconcileDataOwnership                   bool
 	// Capabilities describes backend request features, not host hardware
 	// inventory. The latter is discovered separately when a GPU is requested.
 	Capabilities         []string
@@ -155,6 +169,9 @@ func NewFromClientWithConfig(cli *client.Client, enableBindMounts bool) *Driver 
 
 // NewFromClientWithRuntimeConfig wraps an Engine client with backend settings.
 func NewFromClientWithRuntimeConfig(cli *client.Client, cfg RuntimeConfig) *Driver {
+	if cfg.BackendID == "" {
+		cfg.BackendID = "docker"
+	}
 	return &Driver{cli: cli, enableBindMounts: cfg.EnableBindMounts, runtimeConfig: cfg}
 }
 

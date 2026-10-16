@@ -1,0 +1,1440 @@
+{
+  "schema_version": 2,
+  "upstream_version": "v0.1.4",
+  "upstream_commit": "5a7728c304b5528e954e9ae900cf21f84e1a12b1",
+  "scope": "Every externally deserializable field in pinned DockerComputeConfig and PodmanComputeConfig, including flattened proxy fields. This inventory is not a claim of full config behavior parity.",
+  "fields": [
+    {
+      "backend": "docker",
+      "field": "allow_driver_config",
+      "upstream_type": "bool",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "AllowDriverConfig",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into AllowDriverConfig; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "verified",
+        "omitted": "Upstream and local defaults disable caller-supplied driver_config.",
+        "explicit_empty": "Wrong TOML type; rejected by both typed decoders and the local boolean decoder.",
+        "explicit_zero": "Wrong TOML type; the option is boolean. false is accepted and preserves the disabled default.",
+        "runtime_effect": "true is effective only with the operator-owned resource admission policy; false is rejected before Engine mutation.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/resource_admission_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "resource_admission",
+      "upstream_type": "openshell_core::resource_admission::ResourceAdmissionConfig",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ResourceAdmission",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ResourceAdmission; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "verified",
+        "omitted": "Both implementations enable admission with the pinned shared-approval and workspace labels.",
+        "explicit_empty": "An empty table selects the same defaults; an empty required_labels table is rejected while enabled.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "The policy is validated before caller mounts; named volumes require matching approval/workspace labels and identity is checked again on restart.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/resource_admission.rs",
+          "cautem-core/resourceadmission/admission_test.go",
+          "cautem-driver/internal/docker/resource_admission_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "socket_path",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "daemon endpoint returned by ConfigFromMap",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into daemon endpoint returned by ConfigFromMap; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream probes the configured Docker environment and falls back to /var/run/docker.sock; the local Engine adapter uses Docker client environment settings.",
+        "explicit_empty": "Rejected locally. Upstream retains an explicitly empty PathBuf and fails when creating its Docker client.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "Both select a Docker API endpoint, but discovery and TLS environment precedence still require host acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/register.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "default_image",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "DefaultImage",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into DefaultImage; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Pinned Rust default is nvcr.io/nvidia/base/ubuntu:24.04; local ConfigFromMap leaves the value empty and the driver chooses a Cautem image.",
+        "explicit_empty": "Rejected locally to prevent empty input from silently selecting the product image; upstream accepts the String shape and fails later when creating with the empty image.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "The default image differs by design; an explicit non-empty image is passed to the workload image selection path.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "image_pull_policy",
+      "upstream_type": "ImagePullPolicy",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ImagePullPolicy",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ImagePullPolicy; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to if_not_present. Local empty policy follows the if-not-present path for ordinary images, with a product-image pull environment override.",
+        "explicit_empty": "Rejected locally; upstream enum deserialization rejects an empty variant.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "Canonical policies are translated to image presence/pull behavior. Local aliases extend the upstream vocabulary; newer is rejected for Docker.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/images.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "sandbox_label",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "SandboxNamespace",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into SandboxNamespace; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both use the value default.",
+        "explicit_empty": "Local rejects whitespace-only labels; upstream stores the empty string as a Docker label value.",
+        "explicit_zero": "Wrong TOML type; rejected by both decoders.",
+        "runtime_effect": "The value scopes sandbox labels; empty-value behavior intentionally fails earlier locally and should remain documented.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "grpc_endpoint",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GatewayGRPCEndpoint",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GatewayGRPCEndpoint; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to an empty string. The local Gateway rewrites a configured grpc_endpoint; no implicit endpoint is added when the key is absent.",
+        "explicit_empty": "Accepted and has the same value as omission in the local config; upstream also stores an empty String.",
+        "explicit_zero": "Wrong TOML type; rejected by both decoders.",
+        "runtime_effect": "Endpoint discovery and TLS choice are supplied by the local Gateway/runtime descriptor and are not yet cross-checked against the upstream Docker host path.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "sandbox_runtime_image",
+      "upstream_type": "Option<String>",
+      "local_decoder": "unknown-field-rejected",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned backend extracts a trusted sandbox binary from this image. The local runtime uses Gateway-provided helper binaries and has no equivalent image extraction/cache contract.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream leaves the optional image unset; local helper binaries are selected and staged by the Gateway.",
+        "explicit_empty": "Upstream accepts an empty optional string but local rejects the field as unsupported.",
+        "explicit_zero": "Wrong TOML type; rejected by the upstream string option and local unknown-field gate.",
+        "runtime_effect": "The local runtime does not extract or cache the binary from an OCI image, so explicit configuration fails closed.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "unsupported",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "supervisor_bin",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "unknown-field-rejected",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned Docker setting supplies a host supervisor binary path. Local helper binaries are selected and staged by the Gateway, so accepting this path would have no effect.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream leaves the optional host binary path unset; local helper binaries are selected and staged by the Gateway.",
+        "explicit_empty": "Upstream accepts an empty optional path but local rejects the field as unsupported.",
+        "explicit_zero": "Wrong TOML type; rejected by the upstream path option and local unknown-field gate.",
+        "runtime_effect": "The local Gateway owns binary selection and staging, so explicit host paths fail closed.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "unsupported",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "supervisor_image",
+      "upstream_type": "Option<String>",
+      "local_decoder": "unknown-field-rejected",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned backend runs a separately managed supervisor container from this image. The local backend currently starts its supervisor in the workload container, which changes its isolation and lifecycle boundary.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream leaves the optional supervisor image unset; local helper binaries are selected and staged by the Gateway.",
+        "explicit_empty": "Upstream accepts an empty optional string but local rejects the field as unsupported.",
+        "explicit_zero": "Wrong TOML type; rejected by the upstream string option and local unknown-field gate.",
+        "runtime_effect": "The local runtime does not create a separately managed supervisor container from this image.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "unsupported",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "guest_tls_ca",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GuestTLSCA",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GuestTLSCA; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both leave guest TLS disabled when the CA option is absent.",
+        "explicit_empty": "Local rejects the empty path. Upstream stores Some(empty), enables TLS, then fails while loading the CA material.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "A valid CA enables gateway TLS verification; local and upstream path/readability checks differ in timing.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "guest_tls_cert",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "decodes-then-rejects",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned v0.1.4 config accepts the optional field syntactically but rejects it during driver startup because sandbox identity uses bearer tokens.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to no client certificate.",
+        "explicit_empty": "Rejected locally during decode; upstream deserializes Some(empty) and rejects it during driver startup.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "Any configured client certificate is unsupported because sandbox identity uses bearer tokens; failure stage differs.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "intentional-rejection",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "guest_tls_key",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "decodes-then-rejects",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned v0.1.4 config accepts the optional field syntactically but rejects it during driver startup because sandbox identity uses bearer tokens.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to no client key.",
+        "explicit_empty": "Rejected locally during decode; upstream deserializes Some(empty) and rejects it during driver startup.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "Any configured client key is unsupported because sandbox identity uses bearer tokens; failure stage differs.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "intentional-rejection",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "ssh_socket_path",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "SandboxSSHSocketPath",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into SandboxSSHSocketPath; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to /run/openshell/ssh.sock; local runtime defaults to its Cautem guest SSH socket path.",
+        "explicit_empty": "Local rejects an empty path instead of silently selecting its product default; upstream accepts the empty String shape and the resulting guest SSH path is unusable.",
+        "explicit_zero": "Wrong TOML type; rejected by both string decoders.",
+        "runtime_effect": "The guest SSH socket path is shared with the relay and health/readiness checks; the path differs while the relay behavior is covered locally.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/container_paths.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/runtime_config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "sandbox_pids_limit",
+      "upstream_type": "Option<std::num::NonZeroI64>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "PidsLimit",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into PidsLimit; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream and local runtime default to 2048. Local CAUTEM_SANDBOX_PIDS_LIMIT can override that default, including opting out with zero.",
+        "explicit_empty": "Wrong TOML type; rejected by the upstream typed decoder and local integer decoder.",
+        "explicit_zero": "Rejected by both typed decoders because the field is NonZeroI64.",
+        "runtime_effect": "Positive values set the Engine PIDs limit. The local environment override means omission is not invariant across deployments.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "cautem-driver/internal/docker/resources_test.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "enable_bind_mounts",
+      "upstream_type": "bool",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "EnableBindMounts",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into EnableBindMounts; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to false.",
+        "explicit_empty": "Wrong TOML type; rejected by both boolean decoders.",
+        "explicit_zero": "Wrong TOML type; false is accepted and keeps bind mounts disabled.",
+        "runtime_effect": "true enables caller bind-mount parsing after operator admission; target-host source pinning and race acceptance remain open.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/driver_config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "https_proxy",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyURL",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyURL; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty strings are rejected locally; upstream deserializes the Option and rejects the empty value during shared proxy validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The proxy URL or bypass list is validated and passed only to the supervisor; no proxy credential is exposed in sandbox environment values. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "no_proxy",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyNoProxy",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyNoProxy; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty strings are rejected locally; upstream deserializes the Option and rejects the empty value during shared proxy validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The proxy URL or bypass list is validated and passed only to the supervisor; no proxy credential is exposed in sandbox environment values. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "proxy_auth_file",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyAuthFile",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyAuthFile; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty paths/strings are rejected locally; upstream accepts the option shape and rejects an empty or unusable path during validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The path is validated and mounted for the supervisor; proxy credentials use a secret mount and CA material extends trust. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "proxy_auth_allow_insecure",
+      "upstream_type": "Option<bool>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyAuthAllowInsecure",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyAuthAllowInsecure; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Wrong TOML type. Explicit false is retained as presence and rejected without proxy_auth_file, matching upstream Option<bool> validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "true acknowledges cleartext Basic auth only when a proxy auth file is configured; false has no effect with a secure proxy and auth file. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "proxy_connect_by_hostname",
+      "upstream_type": "Option<bool>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyConnectByHostname",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyConnectByHostname; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Wrong TOML type. Explicit false is retained as presence and rejected without https_proxy, matching upstream Option<bool> validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The boolean selects hostname CONNECT behavior only when a corporate proxy is configured; host/network acceptance remains required. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "proxy_ca_bundle",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UpstreamProxyCABundle",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UpstreamProxyCABundle; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty paths/strings are rejected locally; upstream accepts the option shape and rejects an empty or unusable path during validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The path is validated and mounted for the supervisor; proxy credentials use a secret mount and CA material extends trust. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "provider_spiffe_workload_api_socket",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProviderSPIFFEWorkloadAPISocket",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProviderSPIFFEWorkloadAPISocket; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the projected Workload API socket.",
+        "explicit_empty": "Rejected locally and by upstream path validation.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "A valid host Unix socket is projected read-only to the supervisor; host socket availability and permission behavior still require target-host acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/driver_utils.rs",
+          "cautem-driver/internal/docker/config.go",
+          "cautem-driver/internal/docker/sidecar.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "docker",
+      "field": "app_armor_profile",
+      "upstream_type": "Option<AppArmorProfile>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "AppArmorProfile",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into AppArmorProfile; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit an override and preserve the container runtime default.",
+        "explicit_empty": "Rejected by both enum parsers.",
+        "explicit_zero": "Wrong TOML type; rejected by both enum/string decoders.",
+        "runtime_effect": "Supported profiles are host-checked before mutations and translated to Engine security options; host-specific AppArmor availability still requires acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
+          "cautem-driver/internal/docker/app_armor_test.go",
+          "cautem-driver/internal/docker/config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/docker/config_test.go",
+        "cautem-driver/internal/docker/sdk_contract_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "allow_driver_config",
+      "upstream_type": "bool",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "AllowDriverConfig",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into AllowDriverConfig; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "verified",
+        "omitted": "Upstream and local defaults disable caller-supplied driver_config.",
+        "explicit_empty": "Wrong TOML type; rejected by both typed decoders and the local boolean decoder.",
+        "explicit_zero": "Wrong TOML type; the option is boolean. false is accepted and preserves the disabled default.",
+        "runtime_effect": "true is effective only with the operator-owned resource admission policy; false is rejected before Engine mutation.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/docker/resource_admission_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "resource_admission",
+      "upstream_type": "openshell_core::resource_admission::ResourceAdmissionConfig",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ResourceAdmission",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ResourceAdmission; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "verified",
+        "omitted": "Both implementations enable admission with the pinned shared-approval and workspace labels.",
+        "explicit_empty": "An empty table selects the same defaults; an empty required_labels table is rejected while enabled.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "The policy is validated before caller mounts; named volumes require matching approval/workspace labels and identity is checked again on restart.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/resource_admission.rs",
+          "cautem-core/resourceadmission/admission_test.go",
+          "cautem-driver/internal/docker/resource_admission_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "socket_path",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "SocketPath",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into SocketPath; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both discover a responsive Podman socket; local discovery also honors Docker-compatible environment variables and Quarshell/Cautem candidate paths.",
+        "explicit_empty": "Rejected locally. Upstream retains an explicitly empty PathBuf and attempts to use it instead of discovery.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "Both connect to the selected Podman API socket; discovery order differs and needs host acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/driver.rs",
+          "cautem-driver/internal/podman/podman.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "default_image",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "DefaultImage",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into DefaultImage; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Pinned Rust default is nvcr.io/nvidia/base/ubuntu:24.04; local ConfigFromMap leaves the value empty and the driver chooses a Cautem image.",
+        "explicit_empty": "Rejected locally to prevent empty input from silently selecting the product image; upstream accepts the String shape and fails later when creating with the empty image.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "The default image differs by design; an explicit non-empty image is passed to the workload image selection path.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "image_pull_policy",
+      "upstream_type": "ImagePullPolicy",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ImagePullPolicy",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ImagePullPolicy; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to if_not_present. Local empty policy follows the if-not-present path for ordinary images, with a product-image pull environment override.",
+        "explicit_empty": "Rejected locally; upstream enum deserialization rejects an empty variant.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "Canonical policies are translated to Libpod values. Local aliases extend the upstream vocabulary.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "grpc_endpoint",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GatewayGRPCEndpoint",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GatewayGRPCEndpoint; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to an empty string; upstream falls back through gateway_port and platform host discovery. The local Gateway rewrites a configured grpc_endpoint but does not add a missing key.",
+        "explicit_empty": "Accepted and has the same value as omission in the local config; upstream also stores an empty String.",
+        "explicit_zero": "Wrong TOML type; rejected by both decoders.",
+        "runtime_effect": "Linux and Podman Machine endpoint selection are not yet cross-checked against Gateway runtime injection on each target host.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "gateway_port",
+      "upstream_type": "u16",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GatewayGRPCPort",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GatewayGRPCPort; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to 17670; the local decoder leaves zero and no implicit gateway_port injection is present in registry construction.",
+        "explicit_empty": "Wrong TOML type; rejected by both integer decoders.",
+        "explicit_zero": "Upstream accepts zero as u16; local accepts zero and treats it as no override.",
+        "runtime_effect": "The field controls Podman Machine/host endpoint fallback; direct standalone default parity differs and remains open.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "ssh_socket_path",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "SandboxSSHSocketPath",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into SandboxSSHSocketPath; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to /run/openshell/ssh.sock; local runtime defaults to its Cautem guest SSH socket path.",
+        "explicit_empty": "Local rejects an empty path instead of silently selecting its product default; upstream accepts the empty String shape and the resulting guest SSH path is unusable.",
+        "explicit_zero": "Wrong TOML type; rejected by both string decoders.",
+        "runtime_effect": "The guest SSH socket path is shared with the relay and health/readiness checks; the path differs while the relay behavior is covered locally.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/container_paths.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/docker/runtime_config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "network_name",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "NetworkName",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into NetworkName; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream defaults to openshell; local Engine-backed resource naming uses its Cautem network prefix when this value is empty.",
+        "explicit_empty": "Accepted locally and selects the local fallback; upstream stores an empty String and passes it into network creation.",
+        "explicit_zero": "Wrong TOML type; rejected by both string decoders.",
+        "runtime_effect": "Explicit non-empty values select the network prefix; default resource naming differs and remains a compatibility decision.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/docker/create.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "host_gateway_ip",
+      "upstream_type": "String",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "HostGatewayIP",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into HostGatewayIP; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream selects a Podman Machine host IP on macOS and localhost on Linux; local empty value delegates to Docker-compatible host-gateway aliases.",
+        "explicit_empty": "Accepted locally and treated as omission; upstream also stores an empty String and resolves its platform default.",
+        "explicit_zero": "Wrong TOML type; rejected by both decoders.",
+        "runtime_effect": "The resolved address affects sandbox-to-host proxy routing; macOS and Linux host lanes remain required.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/docker/runtime_config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "stop_timeout_secs",
+      "upstream_type": "u32",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "StopTimeoutSecs",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into StopTimeoutSecs; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "verified",
+        "omitted": "Both configs default to 45 seconds.",
+        "explicit_empty": "Wrong TOML type; rejected by both typed decoders and the local integer decoder.",
+        "explicit_zero": "Accepted and passed through as zero; the local configured bit prevents zero from being replaced by the 10-second Docker adapter fallback.",
+        "runtime_effect": "Native Podman receives the configured stop timeout in seconds.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/docker/runtime_config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "sandbox_runtime_image",
+      "upstream_type": "String",
+      "local_decoder": "unknown-field-rejected",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned backend extracts a trusted sandbox binary from this image. The local runtime uses Gateway-provided helper binaries and has no equivalent image extraction/cache contract.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream selects an environment or compiled default OCI image; local helper binaries are selected and staged by the Gateway.",
+        "explicit_empty": "Upstream accepts an empty optional string but local rejects the field as unsupported.",
+        "explicit_zero": "Wrong TOML type; rejected by the upstream string option and local unknown-field gate.",
+        "runtime_effect": "The local runtime does not extract or cache the binary from an OCI image, so explicit configuration fails closed.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "unsupported",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "supervisor_image",
+      "upstream_type": "String",
+      "local_decoder": "unknown-field-rejected",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned backend runs a separately managed supervisor container from this image. The local backend currently starts its supervisor in the workload container, which changes its isolation and lifecycle boundary.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream selects an environment or compiled default OCI image; local helper binaries are selected and staged by the Gateway.",
+        "explicit_empty": "Upstream accepts an empty optional string but local rejects the field as unsupported.",
+        "explicit_zero": "Wrong TOML type; rejected by the upstream string option and local unknown-field gate.",
+        "runtime_effect": "The local runtime does not create a separately managed supervisor container from this image.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "unsupported",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "guest_tls_ca",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GuestTLSCA",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GuestTLSCA; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both leave guest TLS disabled when the CA option is absent.",
+        "explicit_empty": "Local rejects the empty path. Upstream stores Some(empty), enables TLS, then fails while loading the CA material.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "A valid CA enables gateway TLS verification; local and upstream path/readability checks differ in timing.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "guest_tls_cert",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "decodes-then-rejects",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned v0.1.4 config accepts the optional field syntactically but rejects it during driver startup because sandbox identity uses bearer tokens.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to no client certificate.",
+        "explicit_empty": "Rejected locally during decode; upstream deserializes Some(empty) and rejects it during driver startup.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "Any configured client certificate is unsupported because sandbox identity uses bearer tokens; failure stage differs.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "intentional-rejection",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "guest_tls_key",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "decodes-then-rejects",
+      "local_binding": null,
+      "runtime_or_parity_note": "The pinned v0.1.4 config accepts the optional field syntactically but rejects it during driver startup because sandbox identity uses bearer tokens.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to no client key.",
+        "explicit_empty": "Rejected locally during decode; upstream deserializes Some(empty) and rejects it during driver startup.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "Any configured client key is unsupported because sandbox identity uses bearer tokens; failure stage differs.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "intentional-rejection",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "sandbox_pids_limit",
+      "upstream_type": "Option<NonZeroI64>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "PidsLimit",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into PidsLimit; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream and local runtime default to 2048. Local CAUTEM_SANDBOX_PIDS_LIMIT can override that default, including opting out with zero.",
+        "explicit_empty": "Wrong TOML type; rejected by the upstream typed decoder and local integer decoder.",
+        "explicit_zero": "Rejected by both typed decoders because the field is NonZeroI64.",
+        "runtime_effect": "Positive values set the native Libpod PIDs limit. The local environment override means omission is not invariant across deployments.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "cautem-driver/internal/docker/resources_test.go",
+          "cautem-driver/internal/podman/podman_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "enable_bind_mounts",
+      "upstream_type": "bool",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "EnableBindMounts",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into EnableBindMounts; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to false.",
+        "explicit_empty": "Wrong TOML type; rejected by both boolean decoders.",
+        "explicit_zero": "Wrong TOML type; false is accepted and keeps bind mounts disabled.",
+        "runtime_effect": "true enables caller bind-mount parsing after operator admission; target-host source pinning and race acceptance remain open.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/docker/driver_config_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "provider_spiffe_workload_api_socket",
+      "upstream_type": "Option<PathBuf>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProviderSPIFFEWorkloadAPISocket",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProviderSPIFFEWorkloadAPISocket; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the projected Workload API socket.",
+        "explicit_empty": "Rejected locally and by upstream path validation.",
+        "explicit_zero": "Wrong TOML type; rejected by both path/string decoders.",
+        "runtime_effect": "A valid host Unix socket is projected read-only to the supervisor; host socket availability and permission behavior still require target-host acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/driver_utils.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "app_armor_profile",
+      "upstream_type": "Option<AppArmorProfile>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "AppArmorProfile",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into AppArmorProfile; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit an override and preserve the container runtime default.",
+        "explicit_empty": "Rejected by both enum parsers.",
+        "explicit_zero": "Wrong TOML type; rejected by both enum/string decoders.",
+        "runtime_effect": "Supported profiles are host-checked before mutations and translated to the native Libpod create request; host-specific AppArmor availability still requires acceptance.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/app_armor_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "health_check_interval_secs",
+      "upstream_type": "Option<NonZeroU64>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "HealthCheckIntervalSecs",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into HealthCheckIntervalSecs; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Upstream leaves the supervisor health check disabled while retaining a 10-second workload readiness check. Local combined-container mode applies a 10-second readiness check.",
+        "explicit_empty": "Wrong TOML type; rejected by both typed decoders and the local integer decoder.",
+        "explicit_zero": "Rejected by both typed decoders because the field is NonZeroU64.",
+        "runtime_effect": "Configured intervals update the local container health check; upstream configures a separate supervisor health check. The lifecycle boundary differs.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/container.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/docker/sdk_contract_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "https_proxy",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "HTTPSProxy",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into HTTPSProxy; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty strings are rejected locally; upstream deserializes the Option and rejects the empty value during shared proxy validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The proxy URL or bypass list is validated and passed only to the supervisor; no proxy credential is exposed in sandbox environment values. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "no_proxy",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "NoProxy",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into NoProxy; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty strings are rejected locally; upstream deserializes the Option and rejects the empty value during shared proxy validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The proxy URL or bypass list is validated and passed only to the supervisor; no proxy credential is exposed in sandbox environment values. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "proxy_auth_file",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProxyAuthFile",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProxyAuthFile; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty paths/strings are rejected locally; upstream accepts the option shape and rejects an empty or unusable path during validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The path is validated and mounted for the supervisor; proxy credentials use a secret mount and CA material extends trust. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "proxy_auth_allow_insecure",
+      "upstream_type": "Option<bool>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProxyAuthAllowInsecure",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProxyAuthAllowInsecure; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Wrong TOML type. Explicit false is retained as presence and rejected without proxy_auth_file, matching upstream Option<bool> validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "true acknowledges cleartext Basic auth only when a proxy auth file is configured; false has no effect with a secure proxy and auth file. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "proxy_connect_by_hostname",
+      "upstream_type": "Option<bool>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProxyConnectByHostname",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProxyConnectByHostname; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Wrong TOML type. Explicit false is retained as presence and rejected without https_proxy, matching upstream Option<bool> validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The boolean selects hostname CONNECT behavior only when a corporate proxy is configured; host/network acceptance remains required. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "proxy_ca_bundle",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "ProxyCABundle",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into ProxyCABundle; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both omit the optional setting; false/absent proxy options do not alter the runtime.",
+        "explicit_empty": "Explicit empty paths/strings are rejected locally; upstream accepts the option shape and rejects an empty or unusable path during validation.",
+        "explicit_zero": "Wrong TOML type for this string/path/boolean field; rejected by both decoders.",
+        "runtime_effect": "The path is validated and mounted for the supervisor; proxy credentials use a secret mount and CA material extends trust. Cross-backend egress behavior still needs the remaining target-host lanes.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-core/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "userns",
+      "upstream_type": "Option<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UsernsMode",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UsernsMode; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both configs leave the engine user namespace at its default.",
+        "explicit_empty": "Rejected during userns canonicalization by both implementations.",
+        "explicit_zero": "not-applicable",
+        "runtime_effect": "Supported modes and ID mappings are applied; local compatibility aliases and engine-version/host support still need the full host matrix.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "uidmap",
+      "upstream_type": "Vec<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "UIDMap",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into UIDMap; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to an empty mapping list and apply no explicit UID/GID ranges.",
+        "explicit_empty": "An explicit empty array is accepted by both decoders and applies no mappings.",
+        "explicit_zero": "A numeric zero is not a mapping string and is rejected; each mapping string also requires size greater than zero.",
+        "runtime_effect": "Non-empty ranges require userns=private, are parsed as uint32 container:host:size tuples and reach native Libpod IDMappings; rootless/rootful host acceptance remains open.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/container.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    },
+    {
+      "backend": "podman",
+      "field": "gidmap",
+      "upstream_type": "Vec<String>",
+      "local_decoder": "accepted-and-validated",
+      "local_binding": "GIDMap",
+      "runtime_or_parity_note": "ConfigFromMap maps this field into GIDMap; local runtime effects and exact upstream defaults are tracked separately from this parser inventory.",
+      "value_behavior": {
+        "status": "partial",
+        "omitted": "Both default to an empty mapping list and apply no explicit UID/GID ranges.",
+        "explicit_empty": "An explicit empty array is accepted by both decoders and applies no mappings.",
+        "explicit_zero": "A numeric zero is not a mapping string and is rejected; each mapping string also requires size greater than zero.",
+        "runtime_effect": "Non-empty ranges require userns=private, are parsed as uint32 container:host:size tuples and reach native Libpod IDMappings; rootless/rootful host acceptance remains open.",
+        "evidence_refs": [
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/config.rs",
+          "tools/upstream/openshell-v0.1.4/crates/openshell-driver-podman/src/container.rs",
+          "cautem-driver/internal/podman/config.go",
+          "cautem-driver/internal/podman/podman_test.go",
+          "cautem-driver/internal/podman/libpod_create_test.go"
+        ]
+      },
+      "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
+      "status": "local-path-present",
+      "test_refs": [
+        "cautem-driver/internal/podman/podman_test.go",
+        "cautem-driver/internal/podman/libpod_create_test.go"
+      ]
+    }
+  ]
+}

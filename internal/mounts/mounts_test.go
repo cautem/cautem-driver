@@ -3,6 +3,7 @@ package mounts
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -18,6 +19,63 @@ func TestResolveWorkspaceOK(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("got %q want canonical path %q", got, want)
+	}
+}
+
+func TestWorkspaceSourceRejectsReplacementAfterValidation(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	if err := os.Mkdir(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source, err := ResolveWorkspaceSource(workspace, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(workspace, filepath.Join(root, "original-workspace")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := source.VerifyUnchanged(); err == nil || !strings.Contains(err.Error(), "source changed after validation") {
+		t.Fatalf("VerifyUnchanged() error = %v, want path replacement refusal", err)
+	}
+}
+
+func TestWorkspaceSourcePinsCanonicalSymlinkTarget(t *testing.T) {
+	root := t.TempDir()
+	workspace := filepath.Join(root, "workspace")
+	other := filepath.Join(root, "other")
+	if err := os.Mkdir(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(other, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "project")
+	if err := os.Symlink(workspace, link); err != nil {
+		t.Fatal(err)
+	}
+	canonicalWorkspace, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, err := ResolveWorkspaceSource(link, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, link); err != nil {
+		t.Fatal(err)
+	}
+	if source.Path != canonicalWorkspace {
+		t.Fatalf("canonical source path = %q, want %q", source.Path, canonicalWorkspace)
+	}
+	if err := source.VerifyUnchanged(); err != nil {
+		t.Fatalf("retargeting the original symlink changed the canonical mount source: %v", err)
 	}
 }
 

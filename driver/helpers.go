@@ -62,6 +62,11 @@ func EnsureLinuxAgent(ctx context.Context, runtimeModuleDir string) (string, err
 	return sidecar.EnsureLinuxAgent(ctx, runtimeModuleDir)
 }
 
+// EnsureLinuxSupervisor builds the Linux workload supervisor.
+func EnsureLinuxSupervisor(ctx context.Context, runtimeModuleDir string) (string, error) {
+	return sidecar.EnsureLinuxSupervisor(ctx, runtimeModuleDir)
+}
+
 // ProxyEnv returns HTTP(S)_PROXY env entries pointing at the sidecar hostname.
 func ProxyEnv(proxyHost string, port int) []string { return sidecar.ProxyEnv(proxyHost, port) }
 

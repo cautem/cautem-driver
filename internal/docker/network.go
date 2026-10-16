@@ -21,6 +21,9 @@ func (d *Driver) ensureNetwork(ctx context.Context, netName, sandboxName string,
 		if internal && !inspected.Network.Internal {
 			return false, fmt.Errorf("docker network %s already exists but is not internal; refusing proxy-isolated sandbox", netName)
 		}
+		if internal && d.runtimeConfig.BackendID == "docker" && !inspected.Network.EnableIPv6 {
+			return false, fmt.Errorf("docker network %s does not enable IPv6; refusing proxy-isolated sandbox", netName)
+		}
 		if internal && d.runtimeConfig.NativeNetworkVerify == nil && (inspected.Network.Options["com.docker.network.bridge.gateway_mode_ipv4"] != "isolated" || inspected.Network.Options["com.docker.network.bridge.gateway_mode_ipv6"] != "isolated") {
 			return false, fmt.Errorf("docker network %s does not isolate its host gateway; refusing proxy-isolated sandbox", netName)
 		}
@@ -44,6 +47,7 @@ func (d *Driver) ensureNetwork(ctx context.Context, netName, sandboxName string,
 		return true, nil
 	}
 	options := map[string]string(nil)
+	var enableIPv6 *bool
 	if internal {
 		// Internal=true blocks routed egress but still leaves the bridge gateway
 		// reachable from containers. Isolated gateway mode removes the host-side
@@ -52,11 +56,16 @@ func (d *Driver) ensureNetwork(ctx context.Context, netName, sandboxName string,
 			"com.docker.network.bridge.gateway_mode_ipv4": "isolated",
 			"com.docker.network.bridge.gateway_mode_ipv6": "isolated",
 		}
+		if d.runtimeConfig.BackendID == "docker" {
+			enabled := true
+			enableIPv6 = &enabled
+		}
 	}
 	_, err = d.cli.NetworkCreate(ctx, netName, client.NetworkCreateOptions{
-		Driver:   "bridge",
-		Internal: internal, // fail-closed when proxy sidecar is enabled
-		Options:  options,
+		Driver:     "bridge",
+		EnableIPv6: enableIPv6,
+		Internal:   internal, // fail-closed when proxy sidecar is enabled
+		Options:    options,
 		Labels: map[string]string{
 			labelSandbox: "1",
 			labelName:    sandboxName,

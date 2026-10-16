@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestOpenShellAgentSandboxRenderStartsSuspendedWithGatedWorkload(t *testing.T) {
+func TestCompatAgentSandboxRenderStartsSuspendedWithGatedWorkload(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"pod": {
 			"node_selector": {"pool": "sandbox"},
@@ -200,7 +200,7 @@ func TestParseSandboxDriverConfigRejectsUnaccountedNVIDIAGPU(t *testing.T) {
 	}
 }
 
-func TestOpenShellAgentSandboxRenderSuppressesWorkspacePVCForExplicitSandboxMount(t *testing.T) {
+func TestCompatAgentSandboxRenderSuppressesWorkspacePVCForExplicitSandboxMount(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"volumes": [{"name": "user-data", "persistent_volume_claim": {"claim_name": "pvc-user-data"}}],
 		"containers": {"agent": {"volume_mounts": [{"name": "user-data", "mount_path": "/sandbox/custom"}]}}
@@ -224,7 +224,7 @@ func TestOpenShellAgentSandboxRenderSuppressesWorkspacePVCForExplicitSandboxMoun
 	}
 }
 
-func TestOpenShellAgentSandboxRenderUsesAlphaReplicaField(t *testing.T) {
+func TestCompatAgentSandboxRenderUsesAlphaReplicaField(t *testing.T) {
 	params := testAgentSandboxRenderParams()
 	params.APIVersion = sandboxAPIVersionV1Alpha1
 	params.EnableUserNamespaces = true
@@ -245,7 +245,7 @@ func TestOpenShellAgentSandboxRenderUsesAlphaReplicaField(t *testing.T) {
 	}
 }
 
-func TestOpenShellAgentSandboxRenderRejectsMountsOverManagedRuntime(t *testing.T) {
+func TestCompatAgentSandboxRenderRejectsMountsOverManagedRuntime(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{
 		"volumes": [{"name": "user-data", "persistent_volume_claim": {"claim_name": "pvc-user-data"}}],
 		"containers": {"agent": {"volume_mounts": [{"name": "user-data", "mount_path": "/.openshell"}]}}
@@ -259,7 +259,7 @@ func TestOpenShellAgentSandboxRenderRejectsMountsOverManagedRuntime(t *testing.T
 	}
 }
 
-func TestOpenShellAgentSandboxRenderRejectsMissingBootstrapIdentity(t *testing.T) {
+func TestCompatAgentSandboxRenderRejectsMissingBootstrapIdentity(t *testing.T) {
 	params := testAgentSandboxRenderParams()
 	params.SandboxBootstrapSecretName = ""
 	if _, err := renderAgentSandboxResource(SandboxDriverConfig{}, params); err == nil || !strings.Contains(err.Error(), "bootstrap Secret") {
@@ -272,7 +272,7 @@ func TestOpenShellAgentSandboxRenderRejectsMissingBootstrapIdentity(t *testing.T
 	}
 }
 
-func TestOpenShellSupervisorRenderBindsResourcesToSandboxUID(t *testing.T) {
+func TestCompatSupervisorRenderBindsResourcesToSandboxUID(t *testing.T) {
 	resources, err := renderAgentSandboxRuntimeResources(testAgentSandboxRuntimeRenderParams())
 	if err != nil {
 		t.Fatalf("renderAgentSandboxRuntimeResources() error = %v", err)
@@ -328,7 +328,7 @@ func TestOpenShellSupervisorRenderBindsResourcesToSandboxUID(t *testing.T) {
 	}
 }
 
-func TestOpenShellSupervisorRenderUsesGenerationSecretAndAudienceToken(t *testing.T) {
+func TestCompatSupervisorRenderUsesGenerationSecretAndAudienceToken(t *testing.T) {
 	params := testAgentSandboxRuntimeRenderParams()
 	resources, err := renderAgentSandboxRuntimeResources(params)
 	if err != nil {
@@ -378,7 +378,7 @@ func TestOpenShellSupervisorRenderUsesGenerationSecretAndAudienceToken(t *testin
 	}
 }
 
-func TestOpenShellRuntimeFenceBlocksWorkloadEgress(t *testing.T) {
+func TestCompatRuntimeFenceBlocksWorkloadEgress(t *testing.T) {
 	resources, err := renderAgentSandboxRuntimeResources(testAgentSandboxRuntimeRenderParams())
 	if err != nil {
 		t.Fatalf("renderAgentSandboxRuntimeResources() error = %v", err)
@@ -476,7 +476,7 @@ func TestOpenShellRuntimeFenceBlocksWorkloadEgress(t *testing.T) {
 	}
 }
 
-func TestOpenShellRuntimeFencesAreUniquePerSandboxPair(t *testing.T) {
+func TestCompatRuntimeFencesAreUniquePerSandboxPair(t *testing.T) {
 	firstWorkload, firstSupervisor, err := renderAgentSandboxRuntimeFence("team-a", "sandbox-a", 5500)
 	if err != nil {
 		t.Fatalf("renderAgentSandboxRuntimeFence(first) error = %v", err)
@@ -505,7 +505,7 @@ func TestOpenShellRuntimeFencesAreUniquePerSandboxPair(t *testing.T) {
 	}
 }
 
-func TestOpenShellSupervisorRenderRejectsUnboundIdentity(t *testing.T) {
+func TestCompatSupervisorRenderRejectsUnboundIdentity(t *testing.T) {
 	params := testAgentSandboxRuntimeRenderParams()
 	params.SandboxResourceUID = ""
 	if _, err := renderAgentSandboxRuntimeResources(params); err == nil || !strings.Contains(err.Error(), "UID is required") {

@@ -16,6 +16,7 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/cautem/cautem-core/resourceadmission"
 	"github.com/cautem/cautem-driver/internal/docker"
 )
 
@@ -35,10 +36,14 @@ func New() (*docker.Driver, error) {
 type Config struct {
 	SocketPath                      string
 	DefaultImage                    string
+	AllowDriverConfig               bool
+	ResourceAdmission               *resourceadmission.Config
+	AppArmorProfile                 docker.AppArmorProfile
 	NetworkName                     string
 	HostGatewayIP                   string
 	ImagePullPolicy                 string
 	StopTimeoutSecs                 int
+	StopTimeoutConfigured           bool
 	PidsLimit                       int64
 	EnableBindMounts                bool
 	ProviderSPIFFEWorkloadAPISocket string
@@ -67,6 +72,9 @@ type Config struct {
 // NewWithConfig creates a Podman-backed driver and applies compatible runtime settings.
 func NewWithConfig(cfg Config) (*docker.Driver, error) {
 	var err error
+	if err := cfg.AppArmorProfile.Validate(); err != nil {
+		return nil, fmt.Errorf("podman: %w", err)
+	}
 	if cfg.UsernsMode, err = canonicalUsernsMode(cfg.UsernsMode); err != nil {
 		return nil, err
 	}
@@ -124,6 +132,11 @@ func NewWithConfig(cfg Config) (*docker.Driver, error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.AppArmorProfile.RequiresHostSupport() {
+		if err := validatePodmanAppArmorSupport(host, cfg.AppArmorProfile); err != nil {
+			return nil, err
+		}
+	}
 	clientOptions := []client.Opt{client.WithHost(host)}
 	if strings.TrimSpace(os.Getenv("DOCKER_CERT_PATH")) != "" {
 		clientOptions = append(clientOptions, client.WithTLSClientConfigFromEnv())
@@ -137,11 +150,17 @@ func NewWithConfig(cfg Config) (*docker.Driver, error) {
 		policy = ""
 	}
 	runtimeCfg := docker.RuntimeConfig{
-		RuntimeContext:   podmanRuntimeContext(host),
-		EnableBindMounts: cfg.EnableBindMounts,
-		DefaultImage:     cfg.DefaultImage, NetworkName: cfg.NetworkName,
-		HostGatewayIP: cfg.HostGatewayIP, ImagePullPolicy: policy,
-		StopTimeoutSecs: cfg.StopTimeoutSecs, PidsLimit: cfg.PidsLimit,
+		BackendID:         "podman",
+		RuntimeContext:    podmanRuntimeContext(host),
+		LogDriver:         "k8s-file",
+		EnableBindMounts:  cfg.EnableBindMounts,
+		AllowDriverConfig: cfg.AllowDriverConfig,
+		ResourceAdmission: cfg.ResourceAdmission,
+		DefaultImage:      cfg.DefaultImage, NetworkName: cfg.NetworkName,
+		AppArmorProfile:          cfg.AppArmorProfile,
+		AppArmorSupportValidated: cfg.AppArmorProfile.RequiresHostSupport(),
+		HostGatewayIP:            cfg.HostGatewayIP, ImagePullPolicy: policy,
+		StopTimeoutSecs: cfg.StopTimeoutSecs, StopTimeoutConfigured: cfg.StopTimeoutConfigured, PidsLimit: cfg.PidsLimit,
 		ProviderSPIFFEWorkloadAPISocket: cfg.ProviderSPIFFEWorkloadAPISocket,
 		GatewayGRPCEndpoint:             cfg.GatewayGRPCEndpoint, GatewayGRPCPort: cfg.GatewayGRPCPort,
 		SandboxSSHSocketPath:           cfg.SandboxSSHSocketPath,

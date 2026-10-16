@@ -55,6 +55,9 @@ func (d *Driver) configuredPidsLimit(spec int64) int64 {
 }
 
 func (d *Driver) stopTimeoutSecs() int {
+	if d.runtimeConfig.StopTimeoutConfigured {
+		return d.runtimeConfig.StopTimeoutSecs
+	}
 	if d.runtimeConfig.StopTimeoutSecs > 0 {
 		return d.runtimeConfig.StopTimeoutSecs
 	}

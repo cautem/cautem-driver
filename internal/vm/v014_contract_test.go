@@ -12,7 +12,7 @@ import (
 // crates/openshell-driver-vm/src/driver.rs (pinned upstream commit
 // 77c5ff6e20c98b3674616ecf35b2464f2b8e57ca). Runtime provisioning remains a
 // separate unimplemented contract.
-func TestOpenShellVMConfigValidationContract(t *testing.T) {
+func TestCompatVMConfigValidationContract(t *testing.T) {
 	tests := []struct {
 		name, config, want string
 	}{
@@ -52,7 +52,7 @@ func TestOpenShellVMConfigValidationContract(t *testing.T) {
 	}
 }
 
-func TestOpenShellVMRejectsGPUDeviceIDsWithoutGPURequest(t *testing.T) {
+func TestCompatVMRejectsGPUDeviceIDsWithoutGPURequest(t *testing.T) {
 	_, err := New().Create(context.Background(), driver.Spec{
 		Name:             "contract-sandbox",
 		Image:            "cautem-sandbox:local",
@@ -63,7 +63,7 @@ func TestOpenShellVMRejectsGPUDeviceIDsWithoutGPURequest(t *testing.T) {
 	}
 }
 
-func TestOpenShellVMRejectsMultipleGPUDeviceIDs(t *testing.T) {
+func TestCompatVMRejectsMultipleGPUDeviceIDs(t *testing.T) {
 	_, err := New().Create(context.Background(), driver.Spec{
 		Name:             "contract-sandbox",
 		Image:            "cautem-sandbox:local",
@@ -75,7 +75,7 @@ func TestOpenShellVMRejectsMultipleGPUDeviceIDs(t *testing.T) {
 	}
 }
 
-func TestOpenShellVMRejectsPathUnsafeSandboxNames(t *testing.T) {
+func TestCompatVMRejectsPathUnsafeSandboxNames(t *testing.T) {
 	for _, name := range []string{"", ".", "..", "../escape", "/tmp/escape", "nested/path", "nested\\path", "bad\nid", "bad id", "unicodé", strings.Repeat("a", 129)} {
 		t.Run(name, func(t *testing.T) {
 			_, err := New().Create(context.Background(), driver.Spec{Name: name, Image: "cautem-sandbox:local"})
@@ -86,7 +86,7 @@ func TestOpenShellVMRejectsPathUnsafeSandboxNames(t *testing.T) {
 	}
 }
 
-func TestOpenShellVMDriverConfigAcceptsSingleGPUAndRootfsPath(t *testing.T) {
+func TestCompatVMDriverConfigAcceptsSingleGPUAndRootfsPath(t *testing.T) {
 	config, err := ParseSandboxDriverConfig(`{"gpu_device_ids":["0000:2d:00.0"],"rootfs_tar_path":"/var/lib/cautem/rootfs.tar"}`)
 	if err != nil {
 		t.Fatalf("ParseSandboxDriverConfig() error = %v", err)
@@ -96,5 +96,22 @@ func TestOpenShellVMDriverConfigAcceptsSingleGPUAndRootfsPath(t *testing.T) {
 	}
 	if config.RootfsTarPath != "/var/lib/cautem/rootfs.tar" {
 		t.Fatalf("rootfs_tar_path = %q; want configured path", config.RootfsTarPath)
+	}
+}
+
+func TestVMDriverConfigValidatesHostRelayEndpointTLSContract(t *testing.T) {
+	config, err := ParseSandboxDriverConfig(`{"grpc_endpoint":"gateway.internal:7443","rootfs_tar_path":"/var/lib/cautem/rootfs.tar"}`)
+	if err != nil || config.GRPCEndpoint != "gateway.internal:7443" {
+		t.Fatalf("ParseSandboxDriverConfig() = %+v, %v", config, err)
+	}
+	for _, raw := range []string{
+		`{"grpc_endpoint":"https://gateway.internal:7443"}`,
+		`{"grpc_endpoint":"http://gateway.internal:7443","guest_tls_ca":"/tls/ca.pem","guest_tls_cert":"/tls/cert.pem","guest_tls_key":"/tls/key.pem"}`,
+		`{"grpc_endpoint":"grpc://gateway.internal:7443"}`,
+		`{"grpc_endpoint":"user:secret@gateway.internal:7443"}`,
+	} {
+		if _, err := ParseSandboxDriverConfig(raw); err == nil {
+			t.Errorf("ParseSandboxDriverConfig(%s) accepted invalid relay config", raw)
+		}
 	}
 }

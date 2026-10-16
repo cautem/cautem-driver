@@ -65,7 +65,7 @@ func (client *scriptedSandboxWatchClient) WatchSandboxObjects(ctx context.Contex
 	return result.watch, result.err
 }
 
-func TestOpenShellSandboxWatchDoesNotPublishFailedPartialList(t *testing.T) {
+func TestCompatSandboxWatchDoesNotPublishFailedPartialList(t *testing.T) {
 	watcher := watch.NewFake()
 	client := &scriptedSandboxWatchClient{
 		lists: []sandboxWatchListResult{
@@ -100,7 +100,7 @@ func TestOpenShellSandboxWatchDoesNotPublishFailedPartialList(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxWatchRelistsAfterExpiredResourceVersion(t *testing.T) {
+func TestCompatSandboxWatchRelistsAfterExpiredResourceVersion(t *testing.T) {
 	firstWatcher := watch.NewFake()
 	secondWatcher := watch.NewFake()
 	client := &scriptedSandboxWatchClient{
@@ -159,7 +159,7 @@ func TestOpenShellSandboxWatchRelistsAfterExpiredResourceVersion(t *testing.T) {
 	}
 }
 
-func TestOpenShellSandboxWatchReconnectsFromLastResourceVersionAfterClose(t *testing.T) {
+func TestCompatSandboxWatchReconnectsFromLastResourceVersionAfterClose(t *testing.T) {
 	firstWatcher := watch.NewFake()
 	secondWatcher := watch.NewFake()
 	client := &scriptedSandboxWatchClient{

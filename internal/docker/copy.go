@@ -21,7 +21,7 @@ import (
 // For a directory, destPath is the guest parent directory under which src's basename appears.
 func (d *Driver) CopyTo(ctx context.Context, id core.ID, srcHost, destPath string) error {
 	srcHost = filepath.Clean(srcHost)
-	st, err := os.Stat(srcHost)
+	st, err := os.Lstat(srcHost)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,14 @@ func writeTarDir(tw *tar.Writer, src, base string) error {
 		if rel == "." {
 			name = base + "/"
 		}
-		hdr, err := tar.FileInfoHeader(info, "")
+		linkTarget := ""
+		if info.Mode()&os.ModeSymlink != 0 {
+			linkTarget, err = os.Readlink(path)
+			if err != nil {
+				return err
+			}
+		}
+		hdr, err := tar.FileInfoHeader(info, linkTarget)
 		if err != nil {
 			return err
 		}
@@ -79,8 +86,11 @@ func writeTarDir(tw *tar.Writer, src, base string) error {
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("docker copy to: unsupported source entry type %s", info.Mode().Type())
 		}
 		f, err := os.Open(path)
 		if err != nil {
@@ -93,13 +103,27 @@ func writeTarDir(tw *tar.Writer, src, base string) error {
 }
 
 func writeTarFile(tw *tar.Writer, src string, st os.FileInfo, archiveName string) error {
-	hdr, err := tar.FileInfoHeader(st, "")
+	linkTarget := ""
+	if st.Mode()&os.ModeSymlink != 0 {
+		var err error
+		linkTarget, err = os.Readlink(src)
+		if err != nil {
+			return err
+		}
+	}
+	hdr, err := tar.FileInfoHeader(st, linkTarget)
 	if err != nil {
 		return err
 	}
 	hdr.Name = archiveName
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
+	}
+	if st.Mode()&os.ModeSymlink != 0 {
+		return nil
+	}
+	if !st.Mode().IsRegular() {
+		return fmt.Errorf("docker copy to: unsupported source entry type %s", st.Mode().Type())
 	}
 	f, err := os.Open(src)
 	if err != nil {
@@ -126,7 +150,14 @@ func (d *Driver) CopyFrom(ctx context.Context, id core.ID, srcPath, destHost str
 	defer rc.Close()
 
 	asDir := strings.HasSuffix(destHost, string(os.PathSeparator)) || strings.HasSuffix(destHost, "/")
-	if st, err := os.Stat(destHost); err == nil && st.IsDir() {
+	destInfo, destErr := os.Stat(destHost)
+	if destErr == nil && destInfo.IsDir() {
+		asDir = true
+	}
+	if copied.Stat.Mode.IsDir() {
+		if destErr == nil && !destInfo.IsDir() {
+			return fmt.Errorf("docker copy from: cannot extract directory %q over non-directory destination %q", srcPath, destHost)
+		}
 		asDir = true
 	}
 
@@ -152,7 +183,7 @@ func extractCopyTar(tr *tar.Reader, destHost string, asDir bool, srcPath string)
 		hdr, err := tr.Next()
 		if err == io.EOF {
 			if !asDir && !wroteFile {
-				return fmt.Errorf("docker copy from: no regular file at %s", srcPath)
+				return fmt.Errorf("docker copy from: no file at %s", srcPath)
 			}
 			return nil
 		}
@@ -210,6 +241,26 @@ func extractCopyTar(tr *tar.Reader, destHost string, asDir bool, srcPath string)
 			if err != nil {
 				return err
 			}
+		case tar.TypeSymlink:
+			target := name
+			if !asDir {
+				if wroteFile {
+					return fmt.Errorf("docker copy from: dest %s is a file but archive has multiple entries", destHost)
+				}
+				target = filepath.Base(destHost)
+				wroteFile = true
+			}
+			if err := rejectExistingSymlink(root, target); err != nil {
+				return err
+			}
+			if err := root.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			if err := root.Symlink(hdr.Linkname, target); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("docker copy from: unsupported archive entry type %d at %q", hdr.Typeflag, hdr.Name)
 		}
 	}
 }

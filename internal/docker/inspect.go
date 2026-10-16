@@ -92,6 +92,7 @@ func (d *Driver) ContainerIP(ctx context.Context, containerID, networkName strin
 		if n, ok := c.Container.NetworkSettings.Networks[networkName]; ok && n.IPAddress.IsValid() {
 			return n.IPAddress.String(), nil
 		}
+		return "", fmt.Errorf("docker: no IP for container on network %q", networkName)
 	}
 	if c.Container.NetworkSettings != nil {
 		for _, n := range c.Container.NetworkSettings.Networks {
