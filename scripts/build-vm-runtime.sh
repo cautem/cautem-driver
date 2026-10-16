@@ -36,6 +36,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH="$guest_arch" go -C "$module_dir" build \
   -o "$output_dir/cautem-vm-security-probe-linux-$guest_arch" \
   ./internal/vm/testdata/guest-security-probe
 docker run --rm --platform "linux/$guest_arch" \
+  --user "$(id -u):$(id -g)" -e HOME=/tmp -e GOCACHE=/tmp/go-build-cache \
   -v "$module_dir:/src" -v "$output_dir:/out" -v "$module_cache:/go/pkg/mod:ro" -w /src \
   golang:1.27.2-alpine sh -c \
   'GOMODCACHE=/go/pkg/mod CGO_ENABLED=0 GOOS=linux GOARCH="$1" go build -trimpath -ldflags="-s -w" -o "/out/cautem-vm-guest-agent-linux-$1" ./cmd/cautem-vm-guest-agent' \
