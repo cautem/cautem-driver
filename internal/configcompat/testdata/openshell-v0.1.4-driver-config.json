@@ -68,18 +68,20 @@
         "omitted": "Upstream probes the configured Docker environment and falls back to /var/run/docker.sock; the local Engine adapter uses Docker client environment settings.",
         "explicit_empty": "Rejected locally. Upstream retains an explicitly empty PathBuf and fails when creating its Docker client.",
         "explicit_zero": "not-applicable",
-        "runtime_effect": "Both select a Docker API endpoint, but discovery and TLS environment precedence still require host acceptance.",
+        "runtime_effect": "Both select a Docker API endpoint. A local mutual-TLS Engine test confirms DOCKER_HOST, DOCKER_CERT_PATH, DOCKER_TLS_VERIFY, server validation, and client-certificate authentication; socket discovery and a real external daemon remain target-host acceptance.",
         "evidence_refs": [
           "tools/upstream/openshell-v0.1.4/crates/openshell-driver-docker/src/lib.rs",
           "cautem-driver/internal/docker/register.go",
-          "cautem-driver/internal/docker/config_test.go"
+          "cautem-driver/internal/docker/config_test.go",
+          "cautem-driver/internal/docker/tls_engine_test.go"
         ]
       },
       "null_value_corpus": "TOML has no null token; Go decoder rejects a present nil value. The backend config tests enumerate supported and unsupported null cases.",
       "status": "local-path-present",
       "test_refs": [
         "cautem-driver/internal/docker/config_test.go",
-        "cautem-driver/internal/docker/sdk_contract_test.go"
+        "cautem-driver/internal/docker/sdk_contract_test.go",
+        "cautem-driver/internal/docker/tls_engine_test.go"
       ]
     },
     {
