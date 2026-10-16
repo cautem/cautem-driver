@@ -11,13 +11,19 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
 
 func main() {
+	if len(os.Args) == 4 && os.Args[1] == "spawn-orphans" {
+		spawnOrphans(os.Args[2], os.Args[3])
+		return
+	}
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: tcp-echo <serve-tcp|serve-udp|probe-tcp|probe-udp|probe-connect> <address>")
+		fmt.Fprintln(os.Stderr, "usage: tcp-echo <serve-tcp|serve-udp|probe-tcp|probe-udp|probe-connect> <address> | tcp-echo spawn-orphans <count> <seconds>")
 		os.Exit(3)
 	}
 
@@ -38,6 +44,37 @@ func main() {
 		code = 3
 	}
 	os.Exit(code)
+}
+
+func spawnOrphans(countArg, seconds string) {
+	count, err := strconv.Atoi(countArg)
+	if err != nil || count < 1 || count > 256 {
+		fmt.Fprintf(os.Stderr, "invalid orphan count %q\n", countArg)
+		os.Exit(3)
+	}
+	duration, err := strconv.Atoi(seconds)
+	if err != nil || duration < 1 || duration > 600 {
+		fmt.Fprintf(os.Stderr, "invalid orphan duration %q\n", seconds)
+		os.Exit(3)
+	}
+	pids := make([]string, 0, count)
+	for range count {
+		child := exec.Command("sleep", seconds)
+		child.Stdin = strings.NewReader("")
+		child.Stdout = os.Stdout
+		child.Stderr = os.Stderr
+		if err := child.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "start orphan probe: %v\n", err)
+			os.Exit(3)
+		}
+		pids = append(pids, strconv.Itoa(child.Process.Pid))
+	}
+	if err := os.WriteFile("/tmp/cautem-process-event-child-pids", []byte(strings.Join(pids, "\n")), 0o600); err != nil {
+		fmt.Fprintf(os.Stderr, "write orphan probe PIDs: %v\n", err)
+		os.Exit(3)
+	}
+	fmt.Fprintf(os.Stdout, "spawned %d adopted-child probes: %s\n", len(pids), strings.Join(pids, ","))
+	os.Exit(0)
 }
 
 func serveTCP(address string) int {
