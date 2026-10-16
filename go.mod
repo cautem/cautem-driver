@@ -5,8 +5,8 @@ go 1.27.0
 toolchain go1.27.2
 
 require (
-	github.com/cautem/cautem-core v0.3.0
-	github.com/cautem/cautem-proxy v0.3.0
+	github.com/cautem/quarshell-core v0.3.1-0.20261016151917-f75458088399
+	github.com/cautem/quarshell-proxy v0.3.1-0.20261016154341-8e22505d3706
 	github.com/containerd/errdefs v1.0.0
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0

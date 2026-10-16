@@ -16,7 +16,7 @@ import (
 
 	"github.com/moby/moby/client"
 
-	"github.com/cautem/cautem-core/resourceadmission"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/internal/docker"
 )
 

@@ -21,9 +21,9 @@ import (
 
 	"path/filepath"
 
-	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-core/defaults"
-	"github.com/cautem/cautem-core/resourceadmission"
+	core "github.com/cautem/quarshell-core"
+	"github.com/cautem/quarshell-core/defaults"
+	"github.com/cautem/quarshell-core/resourceadmission"
 	"github.com/cautem/quarshell-driver/driver"
 	"github.com/cautem/quarshell-driver/internal/mounts"
 	"github.com/cautem/quarshell-driver/internal/sidecar"

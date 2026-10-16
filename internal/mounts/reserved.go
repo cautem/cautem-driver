@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 )
 
 // OpenShell-aligned guest reserved roots (cautem control plane + OCI runtime mounts).

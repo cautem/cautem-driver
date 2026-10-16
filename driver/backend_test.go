@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 )
 
 type fakeComputeDriver struct {

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 )
 
 const networkBrokerVsockPort = uint32(5501)

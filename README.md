@@ -20,7 +20,7 @@
 
 Backend setup and runtime limits are maintained in the [Docker](https://cautem.github.io/sandbox.dev/providers/docker/) and [Podman](https://cautem.github.io/sandbox.dev/providers/podman/) guides. The [OpenShell compatibility page](https://cautem.github.io/sandbox.dev/reference/openshell-compatibility/) records the current comparison scope.
 
-**cautem-driver** implements `ComputeDriver` for cautem. Docker and Podman provide the local container lifecycle; Kubernetes provisions Agent Sandbox workloads and a paired Cautem proxy companion. The Kubernetes backend remains experimental until the target cluster passes the live runtime and NetworkPolicy checks in the [Gateway packaging guide](https://github.com/cautem/cautem-gateway/blob/main/packaging/README.md).
+**cautem-driver** implements `ComputeDriver` for cautem. Docker and Podman provide the local container lifecycle; Kubernetes provisions Agent Sandbox workloads and a paired Cautem proxy companion. The Kubernetes backend remains experimental until the target cluster passes the live runtime and NetworkPolicy checks in the [Gateway packaging guide](https://github.com/cautem/quarshell-gateway/blob/main/packaging/README.md).
 
 ### Key Features
 

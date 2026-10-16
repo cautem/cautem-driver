@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 	"github.com/cautem/quarshell-driver/driver"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )

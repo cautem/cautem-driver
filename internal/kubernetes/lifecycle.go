@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

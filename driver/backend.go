@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	core "github.com/cautem/cautem-core"
+	core "github.com/cautem/quarshell-core"
 )
 
 // BackendID is the product-owned identity of a compute implementation.

@@ -8,7 +8,7 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 
-	"github.com/cautem/cautem-core/defaults"
+	"github.com/cautem/quarshell-core/defaults"
 	"github.com/cautem/quarshell-driver/driver"
 )
 
