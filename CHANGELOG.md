@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Run the rootful and rootless Podman 6 Linux API suites on Podman 6.1.4.
+
 ## [v0.3.0] - 2026-10-16
 
 ### Added

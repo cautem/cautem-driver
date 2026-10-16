@@ -1,10 +1,10 @@
-# The official stable nested-Podman image still ships 5.8.7. Use the official
-# Fedora 45 updates-testing package until the nested-Podman image catches up.
+# Pin the Fedora 45 updates-testing package to the current stable Podman 6
+# release so rootful and rootless API tests exercise the same engine version.
 FROM registry.fedoraproject.org/fedora@sha256:9d18781b6490ad36d596fa53cfa3dec2ba805018eccd218aeafc4a89c402e749
 
 RUN dnf --setopt=install_weak_deps=False --enablerepo=updates-testing \
-    install -y podman-6.1.3-1.fc45 fuse-overlayfs shadow-utils-subid \
+    install -y podman-6.1.4-1.fc45 fuse-overlayfs shadow-utils-subid \
     && chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap \
     && test -u /usr/bin/newuidmap -a -u /usr/bin/newgidmap \
-    && test "$(podman --version)" = "podman version 6.1.3" \
+    && test "$(podman --version)" = "podman version 6.1.4" \
     && dnf clean all
