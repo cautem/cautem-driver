@@ -34,7 +34,7 @@ jobs:
         with:
           repository: cautem/cautem-runtime
           path: cautem-runtime
-          ref: c84f3581532e32283bc18233325d52159533e9c2
+          ref: 58cca1e35b2b8d7eddc0cbddfefaf6e7172fc215
 
       - name: Configure Go workspace
         working-directory: ${{ github.workspace }}
