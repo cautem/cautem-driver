@@ -37,21 +37,29 @@ func TestPodmanPullPolicyNeverFailsClosedBeforeNetworkCreate(t *testing.T) {
 }
 
 func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
-	ctx := testenv.RequireContainers(t)
-	_, endpoint, workspace := testenv.RunPodmanDaemon(ctx, t)
+	setupCtx := testenv.RequireContainers(t)
+	daemon, endpoint, workspace := testenv.RunPodmanDaemon(setupCtx, t)
 	t.Setenv("DOCKER_HOST", endpoint)
 	cli, err := client.New(client.WithHost(endpoint), client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cli.Close()
-	pull, err := cli.ImagePull(ctx, testenv.AlpineImage, client.ImagePullOptions{})
+	pullCtx, cancelPull := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancelPull()
+	pull, err := cli.ImagePull(pullCtx, testenv.AlpineImage, client.ImagePullOptions{})
 	if err != nil {
-		t.Fatal(err)
+		logs, _ := daemon.Logs(context.Background())
+		var logText []byte
+		if logs != nil {
+			logText, _ = io.ReadAll(logs)
+			_ = logs.Close()
+		}
+		t.Fatalf("pull digest fixture image: %v; Podman service logs=%q", err, logText)
 	}
 	_, _ = io.Copy(io.Discard, pull)
 	_ = pull.Close()
-	image, err := cli.ImageInspect(ctx, testenv.AlpineImage)
+	image, err := cli.ImageInspect(pullCtx, testenv.AlpineImage)
 	if err != nil || len(image.RepoDigests) == 0 {
 		t.Fatalf("inspect pulled image digests=%v err=%v", image.RepoDigests, err)
 	}
@@ -60,7 +68,7 @@ func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer engine.Close()
-	handle, err := engine.Create(ctx, driver.Spec{Name: "digest-pinned", Image: image.RepoDigests[0], Workspace: workspace, Command: []string{"sleep", "30"}, NoHarden: true})
+	handle, err := engine.Create(pullCtx, driver.Spec{Name: "digest-pinned", Image: image.RepoDigests[0], Workspace: workspace, Command: []string{"sleep", "30"}, NoHarden: true})
 	if err != nil {
 		t.Fatalf("create digest-pinned sandbox: %v", err)
 	}
@@ -69,7 +77,7 @@ func TestPodmanPullPolicySupportsDigestPinnedImage(t *testing.T) {
 		defer cancel()
 		_ = engine.Delete(cleanupCtx, handle.ID)
 	}()
-	inspect, err := cli.ContainerInspect(ctx, string(handle.ID), client.ContainerInspectOptions{})
+	inspect, err := cli.ContainerInspect(pullCtx, string(handle.ID), client.ContainerInspectOptions{})
 	if err != nil || inspect.Container.Image != image.ID {
 		t.Fatalf("container image=%q inspect image=%q err=%v", inspect.Container.Image, image.ID, err)
 	}

@@ -50,6 +50,17 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(policyPath, []byte("version: 1\nnetwork_policies: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	policyCPU := 0.5
+	policyMemoryBytes := int64(256 << 20)
+	policyPidsLimit := int64(128)
+	if os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_CGROUP_LIMITS") == "1" {
+		// Nested rootful Podman on hosted runners has no delegated pids or
+		// memory controllers. Keep that scenario focused on networking. A
+		// rootless or non-nested acceptance run verifies resource limits here.
+		policyCPU = 0
+		policyMemoryBytes = 0
+		policyPidsLimit = -1
+	}
 	// The Podman daemon runs in a disposable Docker container; use a host path
 	// shared with that container rather than this test process's temp directory.
 	bindSource := filepath.Join(workspace, "driver-config-bind")
@@ -62,12 +73,14 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bindSource, "marker"), []byte("bind-ok"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	disableDefaultResourceLimits := os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_CGROUP_LIMITS") == "1"
 	engine, err := podman.NewWithConfig(podman.Config{
-		ImagePullPolicy:         "missing",
-		HealthCheckIntervalSecs: 30,
-		UsernsMode:              "host",
-		EnableBindMounts:        true,
-		AllowDriverConfig:       true,
+		ImagePullPolicy:              "missing",
+		HealthCheckIntervalSecs:      30,
+		UsernsMode:                   "host",
+		EnableBindMounts:             true,
+		AllowDriverConfig:            true,
+		DisableDefaultResourceLimits: disableDefaultResourceLimits,
 		// E2E explicitly exercises caller mounts, including a bind source.
 		ResourceAdmission: &resourceadmission.Config{Enabled: false},
 	})
@@ -110,7 +123,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 	h, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
 		Command:  []string{"/bin/sh", "-c", "echo cautem-podman-e2e-ready; sleep 300"},
-		NoHarden: true, PersistVolume: true, CPU: 0.5, MemoryBytes: 256 << 20, PidsLimit: 128,
+		NoHarden: true, PersistVolume: true, CPU: policyCPU, MemoryBytes: policyMemoryBytes, PidsLimit: policyPidsLimit,
 		ProxyBin: proxyBin, ProxyImage: proxyImage, PolicyPath: policyPath,
 		DriverConfigJSON: driverConfig,
 	})
@@ -166,7 +179,18 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if created.Container.Image != imageInfo.ID {
 		t.Fatalf("container image ID=%q, inspected image ID=%q; create must pin immutable image identity", created.Container.Image, imageInfo.ID)
 	}
-	if created.Container.HostConfig.NanoCPUs != 500_000_000 || created.Container.HostConfig.Memory != 256<<20 || created.Container.HostConfig.PidsLimit == nil || *created.Container.HostConfig.PidsLimit != 128 {
+	gotPidsLimit := int64(0)
+	if created.Container.HostConfig.PidsLimit != nil {
+		gotPidsLimit = *created.Container.HostConfig.PidsLimit
+	}
+	wantPidsLimit := policyPidsLimit
+	if wantPidsLimit < 0 {
+		wantPidsLimit = 0
+	}
+	wantNanoCPUs := int64(policyCPU * 1e9)
+	// Podman may fill in resource defaults in ContainerInspect even when the
+	// nested fixture leaves limits unset because cgroup controllers are absent.
+	if !disableDefaultResourceLimits && (created.Container.HostConfig.NanoCPUs != wantNanoCPUs || created.Container.HostConfig.Memory != policyMemoryBytes || gotPidsLimit != wantPidsLimit) {
 		t.Fatalf("Podman override resource limits missing: %+v", created.Container.HostConfig)
 	}
 	if err := engine.Start(ctx, h.ID); err != nil {
@@ -178,18 +202,17 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err != nil || !proxyNetwork.Network.Internal {
 		t.Fatalf("actual Podman sandbox network internal=%v err=%v; want Internal=true", proxyNetwork.Network.Internal, err)
 	}
+	if len(proxyNetwork.Network.IPAM.Config) == 0 || !proxyNetwork.Network.IPAM.Config[0].Gateway.IsValid() {
+		t.Fatalf("Podman 6 policy network has no inspectable gateway: %+v", proxyNetwork.Network.IPAM.Config)
+	}
+	hostTarget, closeHostTarget := startPodmanHostGatewayProbeTarget(t, ctx, engineClient, image, proxyNetwork.Network.IPAM.Config[0].Gateway.String())
+	defer closeHostTarget()
+	if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("Podman sandbox reached host gateway directly at %s: result=%+v err=%v", hostTarget, result, err)
+	}
 	proxyInfo, err := engineClient.ContainerInspect(ctx, "cautem-proxy-"+name, client.ContainerInspectOptions{})
 	if err != nil {
 		t.Fatalf("inspect Podman policy proxy sidecar: %v", err)
-	}
-	hostTarget := ""
-	if len(proxyNetwork.Network.IPAM.Config) > 0 && proxyNetwork.Network.IPAM.Config[0].Gateway.IsValid() {
-		var closeHostTarget func()
-		hostTarget, closeHostTarget = startPodmanHostGatewayProbeTarget(t, ctx, engineClient, image, proxyNetwork.Network.IPAM.Config[0].Gateway.String())
-		defer closeHostTarget()
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
-			t.Fatalf("Podman sandbox reached host gateway directly at %s: result=%+v err=%v", hostTarget, result, err)
-		}
 	}
 	for _, probe := range [][]string{{"probe-tcp", probeTarget}, {"probe-udp", strings.TrimSuffix(probeTarget, ":17777") + ":17778"}} {
 		result, err := engine.Exec(ctx, core.ID(proxyInfo.Container.ID), driver.ExecRequest{Argv: append([]string{"/usr/local/bin/cautem-tcp-echo"}, probe...)})
@@ -197,16 +220,14 @@ func TestPodmanEngineE2E(t *testing.T) {
 			t.Fatalf("Podman policy sidecar could not reach control listener via bridge: probe=%v exit=%d err=%v", probe, result.ExitCode, err)
 		}
 	}
-	if hostTarget != "" {
-		if _, err := engineClient.ContainerKill(ctx, proxyInfo.Container.ID, client.ContainerKillOptions{Signal: "KILL"}); err != nil {
-			t.Fatalf("stop proxy before host-gateway failure probe: %v", err)
-		}
-		if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
-			t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
-		}
-		if err := engine.Start(ctx, h.ID); err != nil {
-			t.Fatalf("restart sandbox policy proxy after host-gateway failure probe: %v", err)
-		}
+	if _, err := engineClient.ContainerKill(ctx, proxyInfo.Container.ID, client.ContainerKillOptions{Signal: "KILL"}); err != nil {
+		t.Fatalf("stop proxy before host-gateway failure probe: %v", err)
+	}
+	if result, err := engine.Exec(ctx, h.ID, driver.ExecRequest{Argv: []string{"/usr/local/bin/cautem-tcp-echo", "probe-tcp", hostTarget}}); err != nil || result.ExitCode != 0 {
+		t.Fatalf("Podman sandbox reached host gateway after proxy failure at %s: result=%+v err=%v", hostTarget, result, err)
+	}
+	if err := engine.Start(ctx, h.ID); err != nil {
+		t.Fatalf("restart sandbox policy proxy after host-gateway failure probe: %v", err)
 	}
 	for _, probe := range [][]string{
 		{"probe-connect", probeTarget},
@@ -266,25 +287,31 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	if _, err := engineClient.ContainerInspect(ctx, string(h.ID), client.ContainerInspectOptions{}); err == nil {
 		t.Fatalf("container %s still exists after delete", h.ID)
 	}
-	// Explicit private ID maps use host IDs and are exercised in the rootful
-	// lane. The rootless lane uses Podman's allocated maps for auto/no-map.
-	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" {
+	// Explicit private ID maps use host IDs and need delegated cgroup memory
+	// controls at start. Nested rootful CI has no memory.max; a native host
+	// lane must exercise this section. Rootless uses allocated auto/no-map IDs.
+	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" && !disableDefaultResourceLimits {
 		mapped, err := podman.NewWithConfig(podman.Config{
-			ImagePullPolicy:         "missing",
-			UsernsMode:              "private",
-			EnableBindMounts:        true,
-			HealthCheckIntervalSecs: 30,
-			AllowDriverConfig:       true,
-			ResourceAdmission:       &resourceadmission.Config{Enabled: false},
-			UIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
-			GIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
+			ImagePullPolicy:              "missing",
+			UsernsMode:                   "private",
+			EnableBindMounts:             true,
+			HealthCheckIntervalSecs:      30,
+			AllowDriverConfig:            true,
+			DisableDefaultResourceLimits: disableDefaultResourceLimits,
+			ResourceAdmission:            &resourceadmission.Config{Enabled: false},
+			UIDMap:                       []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
+			GIDMap:                       []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
 		})
 		if err != nil {
 			t.Fatalf("create mapped Podman driver: %v", err)
 		}
 		defer mapped.Close()
 		mapName := fmt.Sprintf("podman-map-e2e-%d", time.Now().UnixNano())
-		mapHandle, err := mapped.Create(ctx, driver.Spec{Name: mapName, Image: image, Workspace: workspace, Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: 128, DriverConfigJSON: driverConfig})
+		mapPidsLimit := int64(128)
+		if disableDefaultResourceLimits {
+			mapPidsLimit = -1
+		}
+		mapHandle, err := mapped.Create(ctx, driver.Spec{Name: mapName, Image: image, Workspace: workspace, Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: mapPidsLimit, DriverConfigJSON: driverConfig})
 		if err != nil {
 			t.Fatalf("create sandbox with native Libpod ID maps: %v", err)
 		}
@@ -296,7 +323,7 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 		if mappedHost == nil || mappedInspect.Container.Config == nil || mappedInspect.Container.Config.Healthcheck == nil || mappedInspect.Container.Config.Healthcheck.Interval != 30*time.Second {
 			t.Fatalf("native Libpod create lost healthcheck settings: config=%+v", mappedInspect.Container.Config)
 		}
-		if mappedHost.NanoCPUs != int64(2.0*1e9) || mappedHost.Memory != 4_294_967_296 || mappedHost.PidsLimit == nil || *mappedHost.PidsLimit != 128 {
+		if !disableDefaultResourceLimits && (mappedHost.NanoCPUs != int64(2.0*1e9) || mappedHost.Memory != 4_294_967_296 || mappedHost.PidsLimit == nil || *mappedHost.PidsLimit != 128) {
 			t.Fatalf("native Libpod create lost CPU/memory/PID settings: %+v", mappedHost)
 		}
 		if !slices.Contains(mappedHost.SecurityOpt, "no-new-privileges") {
@@ -335,15 +362,23 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	for _, mode := range []string{"auto", "no-map", "keep-id"} {
 		mode := mode
 		t.Run("userns-"+mode, func(t *testing.T) {
-			usernsDriver, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "missing", UsernsMode: mode})
+			usernsDriver, err := podman.NewWithConfig(podman.Config{
+				ImagePullPolicy:              "missing",
+				UsernsMode:                   mode,
+				DisableDefaultResourceLimits: disableDefaultResourceLimits,
+			})
 			if err != nil {
 				t.Fatalf("create userns=%s Podman driver: %v", mode, err)
 			}
 			defer usernsDriver.Close()
 			id := fmt.Sprintf("podman-userns-%s-e2e-%d", mode, time.Now().UnixNano())
+			modePidsLimit := int64(128)
+			if disableDefaultResourceLimits {
+				modePidsLimit = -1
+			}
 			modeHandle, err := usernsDriver.Create(ctx, driver.Spec{
 				Name: id, Image: image, Workspace: workspace,
-				Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: 128,
+				Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: modePidsLimit,
 			})
 			if err != nil {
 				if mode == "auto" && strings.Contains(strings.ToLower(err.Error()), "not enough unused ids") {

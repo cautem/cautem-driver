@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	defaultPodmanCPU         = 2.0
-	defaultPodmanMemoryBytes = 4_294_967_296
+	defaultPodmanCPU               = 2.0
+	defaultPodmanMemoryBytes int64 = 4_294_967_296
 )
 
 // New returns a compute driver pointed at Podman.
@@ -34,16 +34,20 @@ func New() (*docker.Driver, error) {
 // Config contains Podman Engine settings supported by the Docker-compatible
 // API implementation. Values are applied to Engine requests by docker.Driver.
 type Config struct {
-	SocketPath                      string
-	DefaultImage                    string
-	AllowDriverConfig               bool
-	ResourceAdmission               *resourceadmission.Config
-	AppArmorProfile                 docker.AppArmorProfile
-	NetworkName                     string
-	HostGatewayIP                   string
-	ImagePullPolicy                 string
-	StopTimeoutSecs                 int
-	StopTimeoutConfigured           bool
+	SocketPath            string
+	DefaultImage          string
+	AllowDriverConfig     bool
+	ResourceAdmission     *resourceadmission.Config
+	AppArmorProfile       docker.AppArmorProfile
+	NetworkName           string
+	HostGatewayIP         string
+	ImagePullPolicy       string
+	StopTimeoutSecs       int
+	StopTimeoutConfigured bool
+	// DisableDefaultResourceLimits is reserved for nested compatibility fixtures
+	// whose host does not delegate cgroup controllers. Normal Podman drivers
+	// retain the CPU and memory defaults below.
+	DisableDefaultResourceLimits    bool
 	PidsLimit                       int64
 	EnableBindMounts                bool
 	ProviderSPIFFEWorkloadAPISocket string
@@ -149,6 +153,12 @@ func NewWithConfig(cfg Config) (*docker.Driver, error) {
 	if policy == "missing" {
 		policy = ""
 	}
+	defaultCPU := defaultPodmanCPU
+	defaultMemoryBytes := defaultPodmanMemoryBytes
+	if cfg.DisableDefaultResourceLimits {
+		defaultCPU = 0
+		defaultMemoryBytes = 0
+	}
 	runtimeCfg := docker.RuntimeConfig{
 		BackendID:         "podman",
 		RuntimeContext:    podmanRuntimeContext(host),
@@ -167,8 +177,8 @@ func NewWithConfig(cfg Config) (*docker.Driver, error) {
 		CleanupManifestDir:             cfg.CleanupManifestDir,
 		HealthCheckIntervalSecs:        cfg.HealthCheckIntervalSecs,
 		UsernsMode:                     cfg.UsernsMode,
-		DefaultCPU:                     defaultPodmanCPU,
-		DefaultMemoryBytes:             defaultPodmanMemoryBytes,
+		DefaultCPU:                     defaultCPU,
+		DefaultMemoryBytes:             defaultMemoryBytes,
 		GuestTLSCA:                     cfg.GuestTLSCA,
 		GuestTLSCert:                   cfg.GuestTLSCert,
 		GuestTLSKey:                    cfg.GuestTLSKey,

@@ -164,6 +164,8 @@ jobs:
             echo "- Engine: rootless $version from Fedora 45 in a disposable privileged container"
             echo "- Required tests passed: keep-id driver lifecycle with host UID preservation, service recovery, and rootless userns auto/host/keep-id/no-map modes"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Run Podman 6.1.4 rootless proxy isolation E2E
+        run: bash tests/e2e/podman/run-policy-engine-e2e.sh rootless
       - name: Dump rootless Podman logs on failure
         if: failure()
         run: docker exec cautem-podman-rootless sh -lc 'cat /tmp/podman-rootless-service.log 2>/dev/null || true; podman --version 2>/dev/null || true' || true
