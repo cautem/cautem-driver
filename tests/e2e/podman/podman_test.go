@@ -287,9 +287,10 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	if _, err := engineClient.ContainerInspect(ctx, string(h.ID), client.ContainerInspectOptions{}); err == nil {
 		t.Fatalf("container %s still exists after delete", h.ID)
 	}
-	// Explicit private ID maps use host IDs and are exercised in the rootful
-	// lane. The rootless lane uses Podman's allocated maps for auto/no-map.
-	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" {
+	// Explicit private ID maps use host IDs and need delegated cgroup memory
+	// controls at start. Nested rootful CI has no memory.max; a native host
+	// lane must exercise this section. Rootless uses allocated auto/no-map IDs.
+	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" && !disableDefaultResourceLimits {
 		mapped, err := podman.NewWithConfig(podman.Config{
 			ImagePullPolicy:         "missing",
 			UsernsMode:              "private",
