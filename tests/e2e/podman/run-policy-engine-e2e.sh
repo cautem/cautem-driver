@@ -146,7 +146,7 @@ else
 	docker exec \
 		-e STORAGE_DRIVER=vfs -e DOCKER_HOST="tcp://127.0.0.1:$container_port" \
 		-e CAUTEM_PODMAN_E2E=1 -e CAUTEM_PODMAN_WORKSPACE=/cautem-podman-e2e/workspace \
-		-e CAUTEM_PODMAN_E2E_DISABLE_PIDS_LIMIT=1 \
+		-e CAUTEM_PODMAN_E2E_DISABLE_CGROUP_LIMITS=1 \
 		-e CAUTEM_E2E_SANDBOX_IMAGE="$sandbox_image" -e CAUTEM_PROXY_IMAGE="$proxy_image" \
 		-e CAUTEM_HELPERS_DIR=/cautem-podman-e2e/helpers \
 		"$container_name" /cautem-podman-e2e/podman.test -test.run '^TestPodmanEngineE2E$' -test.count=1 -test.v \

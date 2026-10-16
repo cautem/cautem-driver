@@ -50,12 +50,15 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(policyPath, []byte("version: 1\nnetwork_policies: {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	policyCPU := 0.5
+	policyMemoryBytes := int64(256 << 20)
 	policyPidsLimit := int64(128)
-	if os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_PIDS_LIMIT") == "1" {
-		// Nested Podman service containers on hosted runners may not receive a
-		// delegated pids cgroup controller. Keep this proxy-isolation scenario
-		// focused on networking there. A non-nested acceptance run leaves this
-		// unset and verifies the configured limit as part of this scenario.
+	if os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_CGROUP_LIMITS") == "1" {
+		// Nested rootful Podman on hosted runners has no delegated pids or
+		// memory controllers. Keep that scenario focused on networking. A
+		// rootless or non-nested acceptance run verifies resource limits here.
+		policyCPU = 0
+		policyMemoryBytes = 0
 		policyPidsLimit = -1
 	}
 	// The Podman daemon runs in a disposable Docker container; use a host path
@@ -118,7 +121,7 @@ func TestPodmanEngineE2E(t *testing.T) {
 	h, err := engine.Create(ctx, driver.Spec{
 		Name: name, Image: image, Workspace: workspace,
 		Command:  []string{"/bin/sh", "-c", "echo cautem-podman-e2e-ready; sleep 300"},
-		NoHarden: true, PersistVolume: true, CPU: 0.5, MemoryBytes: 256 << 20, PidsLimit: policyPidsLimit,
+		NoHarden: true, PersistVolume: true, CPU: policyCPU, MemoryBytes: policyMemoryBytes, PidsLimit: policyPidsLimit,
 		ProxyBin: proxyBin, ProxyImage: proxyImage, PolicyPath: policyPath,
 		DriverConfigJSON: driverConfig,
 	})
@@ -182,7 +185,8 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if wantPidsLimit < 0 {
 		wantPidsLimit = 0
 	}
-	if created.Container.HostConfig.NanoCPUs != 500_000_000 || created.Container.HostConfig.Memory != 256<<20 || gotPidsLimit != wantPidsLimit {
+	wantNanoCPUs := int64(policyCPU * 1e9)
+	if created.Container.HostConfig.NanoCPUs != wantNanoCPUs || created.Container.HostConfig.Memory != policyMemoryBytes || gotPidsLimit != wantPidsLimit {
 		t.Fatalf("Podman override resource limits missing: %+v", created.Container.HostConfig)
 	}
 	if err := engine.Start(ctx, h.ID); err != nil {
