@@ -188,7 +188,9 @@ func TestPodmanEngineE2E(t *testing.T) {
 		wantPidsLimit = 0
 	}
 	wantNanoCPUs := int64(policyCPU * 1e9)
-	if created.Container.HostConfig.NanoCPUs != wantNanoCPUs || created.Container.HostConfig.Memory != policyMemoryBytes || gotPidsLimit != wantPidsLimit {
+	// Podman may fill in resource defaults in ContainerInspect even when the
+	// nested fixture leaves limits unset because cgroup controllers are absent.
+	if !disableDefaultResourceLimits && (created.Container.HostConfig.NanoCPUs != wantNanoCPUs || created.Container.HostConfig.Memory != policyMemoryBytes || gotPidsLimit != wantPidsLimit) {
 		t.Fatalf("Podman override resource limits missing: %+v", created.Container.HostConfig)
 	}
 	if err := engine.Start(ctx, h.ID); err != nil {
