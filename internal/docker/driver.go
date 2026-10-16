@@ -9,7 +9,7 @@ import (
 
 	"github.com/cautem/cautem-core/defaults"
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 const (

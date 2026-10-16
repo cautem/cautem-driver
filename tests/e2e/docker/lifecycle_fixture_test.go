@@ -14,9 +14,9 @@ import (
 
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/driver"
-	docker "github.com/cautem/cautem-driver/internal/docker"
-	"github.com/cautem/cautem-driver/tests/internal/testenv"
+	"github.com/cautem/quarshell-driver/driver"
+	docker "github.com/cautem/quarshell-driver/internal/docker"
+	"github.com/cautem/quarshell-driver/tests/internal/testenv"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )

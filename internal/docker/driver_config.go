@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cautem/cautem-driver/internal/mounts"
+	"github.com/cautem/quarshell-driver/internal/mounts"
 	enginemount "github.com/moby/moby/api/types/mount"
 )
 

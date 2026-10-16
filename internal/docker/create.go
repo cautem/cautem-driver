@@ -24,9 +24,9 @@ import (
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/defaults"
 	"github.com/cautem/cautem-core/resourceadmission"
-	"github.com/cautem/cautem-driver/driver"
-	"github.com/cautem/cautem-driver/internal/mounts"
-	"github.com/cautem/cautem-driver/internal/sidecar"
+	"github.com/cautem/quarshell-driver/driver"
+	"github.com/cautem/quarshell-driver/internal/mounts"
+	"github.com/cautem/quarshell-driver/internal/sidecar"
 )
 
 // Create ensures network + optional proxy sidecar + sandbox container (not started).

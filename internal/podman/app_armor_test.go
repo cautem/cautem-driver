@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	docker "github.com/cautem/cautem-driver/internal/docker"
+	docker "github.com/cautem/quarshell-driver/internal/docker"
 )
 
 func TestConfigFromMapParsesAppArmorProfiles(t *testing.T) {

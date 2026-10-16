@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )

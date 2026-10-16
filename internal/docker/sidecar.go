@@ -19,7 +19,7 @@ import (
 
 	core "github.com/cautem/cautem-core"
 	"github.com/cautem/cautem-core/defaults"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 func (d *Driver) createProxySidecar(ctx context.Context, name, netName, img, binPath, policyPath string, port int, caVol, sshVol, tcpDialSocket string, proxyEnv []string, pidsLimit int64) error {

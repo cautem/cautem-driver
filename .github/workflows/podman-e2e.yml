@@ -30,7 +30,7 @@ jobs:
       - name: Checkout core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cautem-core
+          repository: cautem/quarshell-core
           path: cautem-core
           ref: 59fec9b4e887827515979fe01303f2d7152a96f6
       - name: Configure Go workspace

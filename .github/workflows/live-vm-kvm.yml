@@ -28,14 +28,14 @@ jobs:
       - name: Checkout cautem-core
         uses: actions/checkout@v4
         with:
-          repository: cautem/cautem-core
+          repository: cautem/quarshell-core
           path: cautem-core
           ref: 59fec9b4e887827515979fe01303f2d7152a96f6
 
       - name: Checkout cautem-runtime helpers
         uses: actions/checkout@v4
         with:
-          repository: cautem/cautem-runtime
+          repository: cautem/quarshell-runtime
           path: cautem-runtime
           ref: 58cca1e35b2b8d7eddc0cbddfefaf6e7172fc215
 

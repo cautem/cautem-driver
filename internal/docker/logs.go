@@ -13,7 +13,7 @@ import (
 	"time"
 
 	core "github.com/cautem/cautem-core"
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/client"
 )

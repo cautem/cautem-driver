@@ -3,7 +3,7 @@ package kubernetes
 import (
 	"testing"
 
-	"github.com/cautem/cautem-driver/driver"
+	"github.com/cautem/quarshell-driver/driver"
 )
 
 func TestBackendCapabilityInfoAdvertisesRuntimeExtensions(t *testing.T) {
