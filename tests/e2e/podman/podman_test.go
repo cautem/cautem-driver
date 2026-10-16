@@ -73,12 +73,14 @@ func TestPodmanEngineE2E(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bindSource, "marker"), []byte("bind-ok"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	disableDefaultResourceLimits := os.Getenv("CAUTEM_PODMAN_E2E_DISABLE_CGROUP_LIMITS") == "1"
 	engine, err := podman.NewWithConfig(podman.Config{
-		ImagePullPolicy:         "missing",
-		HealthCheckIntervalSecs: 30,
-		UsernsMode:              "host",
-		EnableBindMounts:        true,
-		AllowDriverConfig:       true,
+		ImagePullPolicy:              "missing",
+		HealthCheckIntervalSecs:      30,
+		UsernsMode:                   "host",
+		EnableBindMounts:             true,
+		AllowDriverConfig:            true,
+		DisableDefaultResourceLimits: disableDefaultResourceLimits,
 		// E2E explicitly exercises caller mounts, including a bind source.
 		ResourceAdmission: &resourceadmission.Config{Enabled: false},
 	})
