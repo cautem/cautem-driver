@@ -292,21 +292,26 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	// lane must exercise this section. Rootless uses allocated auto/no-map IDs.
 	if os.Getenv("CAUTEM_PODMAN_ROOTLESS") != "1" && !disableDefaultResourceLimits {
 		mapped, err := podman.NewWithConfig(podman.Config{
-			ImagePullPolicy:         "missing",
-			UsernsMode:              "private",
-			EnableBindMounts:        true,
-			HealthCheckIntervalSecs: 30,
-			AllowDriverConfig:       true,
-			ResourceAdmission:       &resourceadmission.Config{Enabled: false},
-			UIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
-			GIDMap:                  []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
+			ImagePullPolicy:              "missing",
+			UsernsMode:                   "private",
+			EnableBindMounts:             true,
+			HealthCheckIntervalSecs:      30,
+			AllowDriverConfig:            true,
+			DisableDefaultResourceLimits: disableDefaultResourceLimits,
+			ResourceAdmission:            &resourceadmission.Config{Enabled: false},
+			UIDMap:                       []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
+			GIDMap:                       []podman.IDMapping{{ContainerID: 0, HostID: 100000, Size: 65536}},
 		})
 		if err != nil {
 			t.Fatalf("create mapped Podman driver: %v", err)
 		}
 		defer mapped.Close()
 		mapName := fmt.Sprintf("podman-map-e2e-%d", time.Now().UnixNano())
-		mapHandle, err := mapped.Create(ctx, driver.Spec{Name: mapName, Image: image, Workspace: workspace, Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: 128, DriverConfigJSON: driverConfig})
+		mapPidsLimit := int64(128)
+		if disableDefaultResourceLimits {
+			mapPidsLimit = -1
+		}
+		mapHandle, err := mapped.Create(ctx, driver.Spec{Name: mapName, Image: image, Workspace: workspace, Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: mapPidsLimit, DriverConfigJSON: driverConfig})
 		if err != nil {
 			t.Fatalf("create sandbox with native Libpod ID maps: %v", err)
 		}
@@ -318,7 +323,7 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 		if mappedHost == nil || mappedInspect.Container.Config == nil || mappedInspect.Container.Config.Healthcheck == nil || mappedInspect.Container.Config.Healthcheck.Interval != 30*time.Second {
 			t.Fatalf("native Libpod create lost healthcheck settings: config=%+v", mappedInspect.Container.Config)
 		}
-		if mappedHost.NanoCPUs != int64(2.0*1e9) || mappedHost.Memory != 4_294_967_296 || mappedHost.PidsLimit == nil || *mappedHost.PidsLimit != 128 {
+		if !disableDefaultResourceLimits && (mappedHost.NanoCPUs != int64(2.0*1e9) || mappedHost.Memory != 4_294_967_296 || mappedHost.PidsLimit == nil || *mappedHost.PidsLimit != 128) {
 			t.Fatalf("native Libpod create lost CPU/memory/PID settings: %+v", mappedHost)
 		}
 		if !slices.Contains(mappedHost.SecurityOpt, "no-new-privileges") {
@@ -357,15 +362,23 @@ cap=$(awk '/^CapBnd:/ {print $2}' /proc/self/status)
 	for _, mode := range []string{"auto", "no-map", "keep-id"} {
 		mode := mode
 		t.Run("userns-"+mode, func(t *testing.T) {
-			usernsDriver, err := podman.NewWithConfig(podman.Config{ImagePullPolicy: "missing", UsernsMode: mode})
+			usernsDriver, err := podman.NewWithConfig(podman.Config{
+				ImagePullPolicy:              "missing",
+				UsernsMode:                   mode,
+				DisableDefaultResourceLimits: disableDefaultResourceLimits,
+			})
 			if err != nil {
 				t.Fatalf("create userns=%s Podman driver: %v", mode, err)
 			}
 			defer usernsDriver.Close()
 			id := fmt.Sprintf("podman-userns-%s-e2e-%d", mode, time.Now().UnixNano())
+			modePidsLimit := int64(128)
+			if disableDefaultResourceLimits {
+				modePidsLimit = -1
+			}
 			modeHandle, err := usernsDriver.Create(ctx, driver.Spec{
 				Name: id, Image: image, Workspace: workspace,
-				Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: 128,
+				Command: []string{"/bin/sh", "-c", "sleep 300"}, NoHarden: true, PidsLimit: modePidsLimit,
 			})
 			if err != nil {
 				if mode == "auto" && strings.Contains(strings.ToLower(err.Error()), "not enough unused ids") {
