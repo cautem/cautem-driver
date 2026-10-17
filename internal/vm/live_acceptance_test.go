@@ -106,6 +106,7 @@ func TestLiveMicroVMLifecycle(t *testing.T) {
 	first := NewWithHostConfig(host)
 	handle, err := first.Create(ctx, driver.Spec{
 		Name: "live-microvm-acceptance", Image: "alpine:3.22",
+		PidsLimit:                512,
 		DriverConfigJSON:         string(driverConfig),
 		Command:                  []string{"/bin/sh", "-c", "if [ ! -e /workspace/.restart-once ]; then touch /workspace/.restart-once; exit 7; fi; while :; do sleep 1; done"},
 		MainProcessRestartPolicy: "on-failure",
@@ -126,6 +127,7 @@ func TestLiveMicroVMLifecycle(t *testing.T) {
 		t.Fatalf("start live MicroVM: %v; console: %s; worker: %s", err, logs.String(), workerLog)
 	}
 	assertLiveGuestResources(t, ctx, first, handle.ID, host.VCPUs, host.MemoryMiB)
+	assertLiveGuestPidsLimit(t, ctx, first, handle.ID, 512)
 	assertLiveHostLoopbackIsolation(t, ctx, first, handle.ID, "tcp4", "127.0.0.1")
 	assertLiveHostLoopbackIsolation(t, ctx, first, handle.ID, "tcp6", "::1")
 	assertLiveGuestNetworkBoundaries(t, ctx, first, handle.ID, securityProbe)
@@ -472,6 +474,15 @@ func assertLiveGuestResources(t *testing.T, ctx context.Context, d *Driver, id c
 		t.Fatalf("live guest resources = %d vCPU, %d MiB visible memory; want %d vCPU and between %d and %d MiB", cpus, memoryKiB/1024, wantCPUs, wantMinMemoryKiB/1024, wantMaxMemoryKiB/1024)
 	}
 	t.Logf("guest sees %d vCPU and %d MiB memory (configured %d MiB)", cpus, memoryKiB/1024, wantMemoryMiB)
+}
+
+func assertLiveGuestPidsLimit(t *testing.T, ctx context.Context, d *Driver, id core.ID, limit int64) {
+	t.Helper()
+	const cgroup = "/sys/fs/cgroup/quarshell/guest"
+	result, err := d.Exec(ctx, id, driver.ExecRequest{Argv: []string{"/bin/sh", "-c", `test "$(cat ` + cgroup + `/pids.max)" = "` + strconv.FormatInt(limit, 10) + `"`}})
+	if err != nil || result.ExitCode != 0 {
+		t.Fatalf("guest pids.max=%d: result=%+v err=%v", limit, result, err)
+	}
 }
 
 func waitForLiveVMStoppedState(t *testing.T, ctx context.Context, stateDir, id string) {

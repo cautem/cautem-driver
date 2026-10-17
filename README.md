@@ -156,11 +156,16 @@ silently ignored:
   per-sandbox writable rootfs overlay; it is not the Gateway workspace path.
 - A dedicated host identity for the VM worker. Linux namespace root currently
   maps to the Gateway account; macOS workers run as the Gateway account.
-- PIDs limits, GPU/CDI passthrough, display sessions, user labels, extra hosts,
-  published ports, and arbitrary native mounts.
+- GPU/CDI passthrough, display sessions, user labels, extra hosts, published
+  ports, and arbitrary native mounts.
 - End-to-end Gateway → VM workspace, supervisor, policy, restart/recovery, and
   cleanup acceptance. Driver-level lifecycle acceptance does not establish
   this Gateway contract.
+
+Positive `PidsLimit` values are enforced for the whole guest process tree using
+the guest kernel's cgroup v2 pids controller. A positive limit requires the
+supervisor runtime asset. VM startup fails closed when cgroup v2 or its pids
+controller is unavailable; `0` means unset and `-1` means unlimited.
 
 Do not enable VM for Gateway production until the workspace data plane and host
 isolation boundary are implemented and tested on each supported host. Adding

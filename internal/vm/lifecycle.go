@@ -116,7 +116,7 @@ func (d *Driver) startLocked(ctx context.Context, store *stateStore, state sandb
 	}
 	launch := KrunLaunchConfig{
 		RootDisk: state.Rootfs, OverlayDisk: overlayPath,
-		VCPUs: state.VCPUs, MemoryMiB: state.MemoryMiB, WorkDir: "/",
+		VCPUs: state.VCPUs, MemoryMiB: state.MemoryMiB, PidsLimit: launchSpec.PidsLimit, WorkDir: "/",
 		ExecPath: "/bin/sh", Args: []string{"/opt/cautem/vm-init"},
 		Env:         []string{"CAUTEM_VM_CONTROL_TOKEN=" + controlToken},
 		ConsolePath: consolePath, VsockPort: guestControlPort, VsockSocket: guestSocket,
@@ -236,7 +236,7 @@ func (d *Driver) startLocked(ctx context.Context, store *stateStore, state sandb
 	}
 	if _, err := d.exchangeControl(startupCtx, state.ID, guestSocket, controlRequest{
 		Operation: "start-workload", Argv: launchSpec.Command,
-		Env: launchSpec.Env, RestartPolicy: launchSpec.MainProcessRestartPolicy,
+		Env: launchSpec.Env, RestartPolicy: launchSpec.MainProcessRestartPolicy, PidsLimit: launchSpec.PidsLimit,
 		WorkDir: launchSpec.WorkDir, User: launchSpec.User,
 	}); err != nil {
 		return fmt.Errorf("start guest workload: %w", err)

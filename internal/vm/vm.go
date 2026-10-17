@@ -205,6 +205,7 @@ func cloneVMLaunchSpec(spec driver.Spec) vmLaunchSpec {
 	cloned := driver.Spec{
 		Command:                  append([]string(nil), spec.Command...),
 		MainProcessRestartPolicy: spec.MainProcessRestartPolicy,
+		PidsLimit:                spec.PidsLimit,
 		Env:                      append([]string(nil), spec.Env...),
 		ProxyBin:                 spec.ProxyBin,
 		PolicyPath:               spec.PolicyPath,

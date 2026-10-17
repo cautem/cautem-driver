@@ -14,6 +14,7 @@ type KrunLaunchConfig struct {
 	ImageDisk   string
 	VCPUs       uint8
 	MemoryMiB   uint32
+	PidsLimit   int64
 	WorkDir     string
 	ExecPath    string
 	Args        []string
