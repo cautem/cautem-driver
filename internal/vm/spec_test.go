@@ -198,7 +198,13 @@ func TestValidateGuestRuntimeAssetsRequiresCompleteSupervisorAndSSHContracts(t *
 
 func TestValidateGatewayRuntimeListsMissingIntegrations(t *testing.T) {
 	err := New().ValidateGatewayRuntime()
-	for _, capability := range []string{"workspace mounts"} {
+	for _, capability := range []string{
+		"shared workspace data plane",
+		"ownership, persistence, and recovery",
+		"dedicated host identity",
+		"PID limits",
+		"Gateway-to-VM end-to-end acceptance",
+	} {
 		if err == nil || !strings.Contains(err.Error(), capability) {
 			t.Fatalf("ValidateGatewayRuntime() error = %v, want %q", err, capability)
 		}
