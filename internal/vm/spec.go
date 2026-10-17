@@ -85,12 +85,13 @@ func validateResourceLimits(cpu float64, memoryBytes int64) error {
 // ValidateGatewayRuntime reports the Gateway lifecycle guarantees that this
 // experimental backend cannot currently provide. Keeping this preflight
 // separate from per-spec validation lets the Gateway reject before consuming
-// a one-shot rootfs upload or writing sandbox state.
+// a one-shot rootfs upload or writing sandbox state. Keep the reasons aligned
+// with the supported-spec checks and the documented production gates.
 func (d *Driver) ValidateGatewayRuntime() error {
 	if d == nil {
 		return fmt.Errorf("vm driver: driver is nil")
 	}
-	return fmt.Errorf("vm driver: Gateway runtime is unsupported until workspace mounts use fd-backed allowlists under a dedicated host identity")
+	return fmt.Errorf("vm driver: Gateway runtime is unsupported: shared workspace data plane (ownership, persistence, and recovery) is unavailable; VM workers do not have a dedicated host identity; PID limits are unsupported; Gateway-to-VM end-to-end acceptance is incomplete")
 }
 
 func validateNetworkBrokerSpec(spec driver.Spec) error {

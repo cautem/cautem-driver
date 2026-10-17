@@ -102,7 +102,8 @@ and object admission do not verify workload startup or traffic isolation.
 
 The VM backend is experimental and is not yet a production replacement for
 Docker or OpenShell. It implements Create/Start/Stop/Delete/List/Inspect,
-one-shot Exec, console logs, and file copy. The driver launches an isolated
+one-shot Exec, console logs, file copy, and native macOS ARM64/HVF live lifecycle
+acceptance. The driver launches an isolated
 `cautem-vm-worker`; the guest runs a static Go control agent on a host-initiated
 virtio-vsock port. The authenticated host↔guest control channel uses
 length-prefixed JSON protocol v1, and each side rejects unsupported versions.
@@ -146,10 +147,27 @@ Environment and identity values are not written to durable VM state; workload
 input cannot override the guest's reserved identity variables, and root OCI
 identities fail closed. Unit tests cover config merge, defaults, validation and
 digest-pinned recovery. The rootfs must include any runtime files needed by the
-guest. Gateway runtime validation remains fail-closed until host mounts use an
-fd-backed allowlist and a dedicated host identity with tested UID/GID mapping.
-Live OCI workload behavior, Linux KVM and macOS ARM64 Gateway-to-workload lanes
-also remain required.
+guest. Gateway runtime validation remains fail-closed. These Gateway contracts
+are not implemented and are rejected during spec validation instead of being
+silently ignored:
+
+- Shared host workspace mounts, workspace ownership mapping, and workspace
+  persistence/recovery across sandboxes. The current `/workspace` is inside the
+  per-sandbox writable rootfs overlay; it is not the Gateway workspace path.
+- A dedicated host identity for the VM worker. Linux namespace root currently
+  maps to the Gateway account; macOS workers run as the Gateway account.
+- PIDs limits, GPU/CDI passthrough, display sessions, user labels, extra hosts,
+  published ports, and arbitrary native mounts.
+- End-to-end Gateway → VM workspace, supervisor, policy, restart/recovery, and
+  cleanup acceptance. Driver-level lifecycle acceptance does not establish
+  this Gateway contract.
+
+Do not enable VM for Gateway production until the workspace data plane and host
+isolation boundary are implemented and tested on each supported host. Adding
+virtio-fs alone is insufficient: libkrun documents that the guest may access
+files outside the selected share unless the host provides an additional
+isolation boundary. Linux KVM acceptance remains a separate live-host gate; an
+artifact cross-build is not a substitute.
 
 Build the native worker, static Linux guest agent, `cautem-init`,
 `cautem-supervisor`, and `cautem-sshd` with `scripts/build-vm-runtime.sh`
