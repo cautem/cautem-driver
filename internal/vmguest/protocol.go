@@ -22,6 +22,7 @@ type Request struct {
 	Env           []string `json:"env,omitempty"`
 	User          string   `json:"user,omitempty"`
 	RestartPolicy string   `json:"restart_policy,omitempty"`
+	PidsLimit     int64    `json:"pids_limit,omitempty"`
 	WorkDir       string   `json:"workdir,omitempty"`
 	Stdin         []byte   `json:"stdin,omitempty"`
 	NoLoginShell  bool     `json:"no_login_shell,omitempty"`

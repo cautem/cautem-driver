@@ -360,6 +360,28 @@ mount -t sysfs sysfs /sys 2>/dev/null || true
 mount -t devtmpfs devtmpfs /dev 2>/dev/null || true
 mount -t tmpfs tmpfs /run 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
+case "${CAUTEM_VM_PIDS_LIMIT:-}" in
+  ''|-1) ;;
+  *)
+    mkdir -p /sys/fs/cgroup
+    if ! grep -q ' cgroup2 ' /proc/mounts; then
+      mount -t cgroup2 -o rw cgroup2 /sys/fs/cgroup || { echo 'VM PID limit requires cgroup v2' >&2; exit 1; }
+    else
+      mount -o remount,rw /sys/fs/cgroup || { echo 'VM PID limit requires a writable cgroup v2 mount' >&2; exit 1; }
+    fi
+    grep -qw pids /sys/fs/cgroup/cgroup.controllers || { echo 'VM PID limit requires the cgroup v2 pids controller' >&2; exit 1; }
+    if ! grep -qw pids /sys/fs/cgroup/cgroup.subtree_control; then
+      echo +pids > /sys/fs/cgroup/cgroup.subtree_control || { echo 'cannot enable the cgroup v2 pids controller' >&2; exit 1; }
+    fi
+    mkdir -p /sys/fs/cgroup/quarshell
+    if ! grep -qw pids /sys/fs/cgroup/quarshell/cgroup.subtree_control; then
+      echo +pids > /sys/fs/cgroup/quarshell/cgroup.subtree_control || { echo 'cannot enable the guest pids subtree controller' >&2; exit 1; }
+    fi
+    mkdir -p /sys/fs/cgroup/quarshell/guest
+    echo "$CAUTEM_VM_PIDS_LIMIT" > /sys/fs/cgroup/quarshell/guest/pids.max || { echo 'cannot configure guest pids.max' >&2; exit 1; }
+    echo $$ > /sys/fs/cgroup/quarshell/guest/cgroup.procs
+    ;;
+esac
 mount -o remount,ro / 2>/dev/null || true
 mkdir -p /overlay /lower /newroot
 mount -t ext4 -o rw /dev/vdb /overlay

@@ -88,7 +88,7 @@ func TestKrunConfigAndCStringVectorRejectUnsafeValues(t *testing.T) {
 }
 
 func TestKrunGuestEnvironmentForcesPIDOneAndVsockMapping(t *testing.T) {
-	got := libkrunGuestEnvironment([]string{"KRUN_INIT_PID1=0", "HOME=/root", "KRUN_INIT_PID1=unexpected"})
+	got := libkrunGuestEnvironment([]string{"KRUN_INIT_PID1=0", "HOME=/root", "KRUN_INIT_PID1=unexpected", "CAUTEM_VM_PIDS_LIMIT=900"})
 	count := 0
 	for _, entry := range got {
 		if strings.HasPrefix(entry, "KRUN_INIT_PID1=") {
@@ -100,6 +100,11 @@ func TestKrunGuestEnvironmentForcesPIDOneAndVsockMapping(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("PID1 entries = %v", got)
+	}
+	for _, entry := range got {
+		if strings.HasPrefix(entry, "CAUTEM_VM_PIDS_LIMIT=") {
+			t.Fatalf("caller overrode reserved VM PID limit: %v", got)
+		}
 	}
 	var calls []string
 	api := fakeLibKrunAPI(&calls)
@@ -118,6 +123,22 @@ func TestKrunGuestEnvironmentForcesPIDOneAndVsockMapping(t *testing.T) {
 	defer guest.Close()
 	if !containsCall(calls, "add_vsock_port") {
 		t.Fatalf("vsock mapping wasn't configured: %v", calls)
+	}
+}
+
+func TestKrunLaunchConfigValidatesAndForwardsPidsLimit(t *testing.T) {
+	config := validKrunConfig()
+	config.PidsLimit = 64
+	if err := config.validate(); err != nil {
+		t.Fatalf("valid PID limit rejected: %v", err)
+	}
+	config.PidsLimit = 1_000_001
+	if err := config.validate(); err == nil || !strings.Contains(err.Error(), "PID limit must be") {
+		t.Fatalf("invalid PID limit error = %v", err)
+	}
+	config.PidsLimit = -1
+	if err := config.validate(); err != nil {
+		t.Fatalf("unlimited PID limit rejected: %v", err)
 	}
 }
 

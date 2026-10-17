@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"unsafe"
@@ -188,6 +189,9 @@ func (c KrunLaunchConfig) validate() error {
 	if c.VCPUs == 0 || c.MemoryMiB == 0 {
 		return fmt.Errorf("libkrun launch config requires positive vCPU and memory values")
 	}
+	if c.PidsLimit < -1 || c.PidsLimit > 1_000_000 {
+		return fmt.Errorf("libkrun PID limit must be -1 or between 0 and 1000000")
+	}
 	return nil
 }
 
@@ -262,6 +266,9 @@ func (c *krunContext) configure(config KrunLaunchConfig) error {
 		return fmt.Errorf("encode libkrun argv: %w", err)
 	}
 	envValues := libkrunGuestEnvironment(config.Env)
+	if config.PidsLimit > 0 {
+		envValues = append(envValues, "CAUTEM_VM_PIDS_LIMIT="+strconv.FormatInt(config.PidsLimit, 10))
+	}
 	envOwners, env, err := cStringVector(envValues)
 	if err != nil {
 		return fmt.Errorf("encode libkrun environment: %w", err)
@@ -279,7 +286,7 @@ func (c *krunContext) configure(config KrunLaunchConfig) error {
 func libkrunGuestEnvironment(environment []string) []string {
 	values := make([]string, 0, len(environment)+1)
 	for _, value := range environment {
-		if !strings.HasPrefix(value, "KRUN_INIT_PID1=") {
+		if !strings.HasPrefix(value, "KRUN_INIT_PID1=") && !strings.HasPrefix(value, "CAUTEM_VM_PIDS_LIMIT=") {
 			values = append(values, value)
 		}
 	}

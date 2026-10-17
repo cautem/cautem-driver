@@ -357,6 +357,12 @@ func (s *controlServer) startWorkload(ctx context.Context, request Request) erro
 	if len(request.Argv) == 0 {
 		return fmt.Errorf("workload argv is empty")
 	}
+	if request.PidsLimit < -1 || request.PidsLimit > 1_000_000 {
+		return fmt.Errorf("workload PID limit must be -1 or between 0 and 1000000")
+	}
+	if request.PidsLimit > 0 && !s.supervisorEnabled {
+		return fmt.Errorf("a positive PID limit requires the guest supervisor")
+	}
 	restartPolicy, err := normalizeGuestRestartPolicy(request.RestartPolicy)
 	if err != nil {
 		return err
@@ -393,6 +399,9 @@ func (s *controlServer) startWorkload(ctx context.Context, request Request) erro
 			"CAUTEM_MAIN_PROCESS_RESTART_POLICY="+restartPolicy,
 			guestSupervisorReadyEnv+"="+readyPath,
 		)
+		if request.PidsLimit > 0 {
+			command.Env = mergeGuestEnvironment(command.Env, "CAUTEM_MAIN_PROCESS_PIDS_LIMIT="+strconv.FormatInt(request.PidsLimit, 10))
+		}
 		if request.User != "" {
 			command.Env = mergeGuestEnvironment(command.Env, "OPENSHELL_OCI_IMAGE_USER="+request.User)
 		}

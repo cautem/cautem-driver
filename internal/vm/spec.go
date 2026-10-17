@@ -29,6 +29,12 @@ func (d *Driver) ValidateSpec(spec driver.Spec) error {
 	if err := validateResourceLimits(spec.CPU, spec.MemoryBytes); err != nil {
 		return err
 	}
+	if spec.PidsLimit < -1 || spec.PidsLimit > 1_000_000 {
+		return fmt.Errorf("vm driver: PID limit must be -1 or between 0 and 1000000")
+	}
+	if spec.PidsLimit > 0 && spec.SupervisorBin == "" {
+		return fmt.Errorf("vm driver: a positive PID limit requires supervisor_bin")
+	}
 	if err := validateNetworkBrokerSpec(spec); err != nil {
 		return err
 	}
@@ -91,7 +97,7 @@ func (d *Driver) ValidateGatewayRuntime() error {
 	if d == nil {
 		return fmt.Errorf("vm driver: driver is nil")
 	}
-	return fmt.Errorf("vm driver: Gateway runtime is unsupported: shared workspace data plane (ownership, persistence, and recovery) is unavailable; VM workers do not have a dedicated host identity; PID limits are unsupported; Gateway-to-VM end-to-end acceptance is incomplete")
+	return fmt.Errorf("vm driver: Gateway runtime is unsupported: shared workspace data plane (ownership, persistence, and recovery) is unavailable; VM workers do not have a dedicated host identity; Gateway-to-VM end-to-end acceptance is incomplete")
 }
 
 func validateNetworkBrokerSpec(spec driver.Spec) error {
@@ -222,7 +228,6 @@ func validateSupportedSpec(spec driver.Spec) error {
 	add(spec.GatewayURL != "", "gateway_url")
 	add(spec.PersistVolume, "persist_volume")
 	add(spec.GPU || spec.GPUCount != 0 || len(spec.CDIDevices) != 0, "gpu")
-	add(spec.PidsLimit != 0, "pids_limit")
 	add(spec.ProxyImage != "", "proxy_image")
 	add(len(spec.PublishPorts) != 0, "publish_ports")
 	if len(unsupported) != 0 {

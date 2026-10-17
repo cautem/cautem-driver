@@ -32,7 +32,6 @@ func TestValidateSupportedSpecRejectsUnimplementedCapabilities(t *testing.T) {
 		{"GPU", "gpu", func(spec *driver.Spec) { spec.GPU = true }},
 		{"GPU count", "gpu", func(spec *driver.Spec) { spec.GPUCount = 1 }},
 		{"CDI devices", "gpu", func(spec *driver.Spec) { spec.CDIDevices = []string{"nvidia.com/gpu=0"} }},
-		{"PID limit", "pids_limit", func(spec *driver.Spec) { spec.PidsLimit = 128 }},
 		{"proxy image", "proxy_image", func(spec *driver.Spec) { spec.ProxyImage = "proxy:latest" }},
 		{"published ports", "publish_ports", func(spec *driver.Spec) { spec.PublishPorts = []driver.PortPublish{{Host: 8080, Guest: 80}} }},
 	}
@@ -196,13 +195,29 @@ func TestValidateGuestRuntimeAssetsRequiresCompleteSupervisorAndSSHContracts(t *
 	}
 }
 
+func TestValidateSpecRequiresSupervisorForPositivePidsLimit(t *testing.T) {
+	spec := driver.Spec{Name: "limited", Image: "fixture:latest", PidsLimit: 128}
+	if err := New().ValidateSpec(spec); err == nil || !strings.Contains(err.Error(), "positive PID limit requires supervisor_bin") {
+		t.Fatalf("ValidateSpec() error = %v, want supervisor requirement", err)
+	}
+	spec.SupervisorBin = "/usr/bin/cautem-supervisor"
+	if err := validateSupportedSpec(spec); err != nil {
+		t.Fatalf("validateSupportedSpec() rejected supported PID limit: %v", err)
+	}
+	for _, limit := range []int64{-2, 1_000_001} {
+		spec.PidsLimit = limit
+		if err := New().ValidateSpec(spec); err == nil || !strings.Contains(err.Error(), "PID limit must be -1") {
+			t.Errorf("ValidateSpec(PidsLimit=%d) error = %v", limit, err)
+		}
+	}
+}
+
 func TestValidateGatewayRuntimeListsMissingIntegrations(t *testing.T) {
 	err := New().ValidateGatewayRuntime()
 	for _, capability := range []string{
 		"shared workspace data plane",
 		"ownership, persistence, and recovery",
 		"dedicated host identity",
-		"PID limits",
 		"Gateway-to-VM end-to-end acceptance",
 	} {
 		if err == nil || !strings.Contains(err.Error(), capability) {
